@@ -676,6 +676,10 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
 <div class="sec" id="s2">
   <div class="sec-title">İş Açıklaması</div>
   <div class="sec-sub">Yapılan işler ve detaylar.</div>
+  <div class="card"><div class="clabel">İşin Tanımı <span style="color:var(--muted);font-weight:400">(kısa başlık)</span></div>
+    <input type="text" id="jobTitle" placeholder="Örn: TPMS Periyodik Bakım, Arıza Giderme…"/></div>
+  <div class="card"><div class="clabel">Makine / Makina Tipi</div>
+    <input type="text" id="machineInfo" placeholder="Örn: TBA-19, Dolum Makinesi, Rotamin Kesim Ünitesi…"/></div>
   <div class="card"><div class="clabel">Yapılan İşler *</div>
     <textarea id="workDesc" placeholder="Bakım, onarım, kurulum…"></textarea></div>
   <div class="card"><div class="clabel">Kullanılan / Değiştirilen Parçalar</div>
@@ -749,6 +753,7 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
     <div class="lunch-note" id="pvLunch" style="display:none;"></div>
   </div>
   <div class="card">
+    <div id="pvJobTitle" style="margin-bottom:8px;"></div>
     <div class="clabel">Yapılan İşler</div>
     <div id="pvWork" style="font-size:13px;line-height:1.6;white-space:pre-wrap;color:#333;"></div>
     <div id="pvMat" style="margin-top:7px;"></div>
@@ -792,7 +797,7 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
 const S={
   eng:'',client:'',ctContact:'',ctEmail:'',otLimit:'17:30',
   refNo:'',weekOffset:0,extraWeeks:[],selectedDays:[],blocks:{},
-  workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
+  jobTitle:'',machineInfo:'',workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
   sigDataUrl:'',sigName:'',sigTitle:'',sigDT:''
 };
 
@@ -918,7 +923,7 @@ function validate(n){
       const dow=dayOfWeek(ds);
       const dnm=DN[dow];
       const d=new Date(ds+'T00:00:00');
-      const dlbl=dnm+' '+d.toLocaleDateString('tr-TR');
+      const dlbl=d.toLocaleDateString('tr-TR')+' '+dnm;
       if(!(S.blocks[ds]||[]).length){showErr(dlbl+' günü boş — blok ekleyin.');return false;}
       for(let bi=0;bi<S.blocks[ds].length;bi++){
         const b=S.blocks[ds][bi];
@@ -932,6 +937,8 @@ function validate(n){
     buildRef();
   }
   if(n===2){
+    S.jobTitle=document.getElementById('jobTitle').value;
+    S.machineInfo=document.getElementById('machineInfo').value;
     S.workDesc=document.getElementById('workDesc').value;
     S.materials=document.getElementById('materials').value;
     S.recommendations=document.getElementById('recommendations').value;
@@ -1216,6 +1223,7 @@ function refreshBlk(ds,bi){
 }
 
 function fmtH(h){const m=Math.round(h*60);const hh=Math.floor(m/60),mm=m%60;return mm===0?hh+' saat':hh+' saat '+mm+' dk';}
+function fmtHC(h){const m=Math.round(h*60);const hh=Math.floor(m/60),mm=m%60;return mm===0?hh+'sa':hh+'sa '+String(mm).padStart(2,'0')+'dk';}
 function toggleDD(ds){document.getElementById('ddhdr_'+ds).classList.toggle('open');document.getElementById('ddbody_'+ds).classList.toggle('open');}
 
 // ═══ TIME MATH ════════════════════════════════════════════════════════════
@@ -1417,7 +1425,7 @@ function buildPreview(){
     const dd2=String(d.getDate()).padStart(2,'0');
     const mm2=String(d.getMonth()+1).padStart(2,'0');
     const yy=d.getFullYear();
-    item.innerHTML='<div class="dsi-head">'+DN[dow]+', '+dd2+'/'+mm2+'/'+yy+'</div><div class="dsi-bgs">'+bgs+'</div>';
+    item.innerHTML='<div class="dsi-head">'+dd2+'/'+mm2+'/'+yy+' '+DN[dow]+'</div><div class="dsi-bgs">'+bgs+'</div>';
     dd.appendChild(item);
   });
 
@@ -1438,6 +1446,13 @@ function buildPreview(){
   const ln=document.getElementById('pvLunch');
   if(tL>0){ln.textContent='🍽️ Öğle arası (12:00–13:00) toplam '+fmtH(tL)+' düşüldü.';ln.style.display='block';}
   else ln.style.display='none';
+  const pvJobTitleEl=document.getElementById('pvJobTitle');
+  if(pvJobTitleEl){
+    let jtHtml='';
+    if(S.jobTitle&&S.jobTitle.trim()) jtHtml+='<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;">İŞİN TANIMI</div><div style="font-size:13px;font-weight:600;color:#333;margin-bottom:6px;">'+S.jobTitle+'</div>';
+    if(S.machineInfo&&S.machineInfo.trim()) jtHtml+='<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;">MAKİNE</div><div style="font-size:13px;font-weight:600;color:#333;">'+S.machineInfo+'</div>';
+    pvJobTitleEl.innerHTML=jtHtml;
+  }
   document.getElementById('pvWork').textContent=S.workDesc;
   document.getElementById('pvMat').innerHTML=S.materials?'<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;">KULLANILAN PARÇALAR</div><div style="font-size:13px;white-space:pre-wrap;">'+S.materials+'</div>':'';
   document.getElementById('pvRec').innerHTML=S.recommendations?'<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;">SONRAKİ AKSİYONLAR</div><div style="font-size:13px;white-space:pre-wrap;">'+S.recommendations+'</div>':'';
@@ -1547,7 +1562,7 @@ function genPDF(){
     doc.setTextColor(255,255,255);sfb();doc.setFontSize(14);
     doc.text('SAHA ÇALIŞMA RAPORU',M,9);
     doc.setFontSize(8);sf();doc.setTextColor(245,166,35);
-    doc.text('Field Service Report  |  '+new Date().toLocaleDateString('tr-TR'),M,15);
+    doc.text('Field Service Report    '+new Date().toLocaleDateString('tr-TR'),M,15);
     doc.setTextColor(180,195,215);
     doc.text('Ref: '+S.refNo+'   Mühendis: '+S.eng+'   Hafta: '+wn,W-M,15,{align:'right'});
     y=30;
@@ -1563,18 +1578,25 @@ function genPDF(){
     });
     y+=4;
 
-    // HOURS HEADER
+        // HOURS HEADER
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(8);
-    doc.text('ÇALIŞMA & SEYAHAT SAATLERİ  |  * Öğle arası (12:00-13:00) düşülmüştür',M+2,y+5);
+    doc.text('ÇALIŞMA & SEYAHAT SAATLERİ',M+2,y+5);
     y+=7;
 
     // TABLE HEADER
-    const cw=[36,18,42,20,18,18,16];
+    // Column widths — widened FM-1/FM-2/Öğle so compact durations never collide.
+    // Total = 182mm, fits within the usable page width (W-2*M ≈ 182mm).
+    const cw=[40,18,34,22,24,24,20];
+    const colX=[M+2]; for(let i=0;i<cw.length;i++) colX.push(colX[i]+cw[i]);
     const hdrs=['Gün/Tarih','Tür','Saat Aralığı','Net Süre','FM-1','FM-2','Öğle'];
     doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
     sfb();doc.setFontSize(7);doc.setTextColor(50,60,80);
-    let xc=M+2;hdrs.forEach((h,i)=>{doc.text(h,xc,y+4);xc+=cw[i];});y+=6;
+    hdrs.forEach((h,i)=>{doc.text(h,colX[i],y+4);});
+    y+=6;
+    // Thin vertical separators between header columns for clarity
+    doc.setDrawColor(200,205,215);
+    for(let i=1;i<cw.length;i++){ doc.line(colX[i]-2,y-6,colX[i]-2,y); }
 
     let tw=0,tt=0,tf1=0,tf2=0,tL=0,ri=0;
     S.selectedDays.forEach(ds=>{
@@ -1595,24 +1617,42 @@ function genPDF(){
         const tl=b.type==='go'?'Gidiş':b.type==='work'?'Çalışma':'Dönüş';
         const cx=crossMid(b.start,b.end)?'(+1)':'';
         sf();doc.setFontSize(8);doc.setTextColor(20,20,40);
-        xc=M+2;
-        doc.text(bi===0?(DN[di]+' '+String(d.getDate()).padStart(2,'0')+'/'+(String(d.getMonth()+1).padStart(2,'0'))):'',xc,y+5);xc+=cw[0];
+        // Gün/Tarih — now includes the year (DD/MM/YYYY)
+        const dateStr=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+        doc.text(bi===0?(dateStr+' '+DN[di]):'',colX[0],y+5);
         if(b.type==='work')doc.setTextColor(20,80,160);else if(b.type==='ret')doc.setTextColor(30,120,50);else doc.setTextColor(150,70,0);
-        doc.text(tl,xc,y+5);xc+=cw[1];doc.setTextColor(20,20,40);
-        doc.text(b.start+'-'+b.end+cx,xc,y+5);xc+=cw[2];
-        doc.text(fmtH(dur),xc,y+5);xc+=cw[3];
-        if(ot.fm1>0){doc.setTextColor(200,100,0);doc.text(fmtH(ot.fm1),xc,y+5);doc.setTextColor(20,20,40);}xc+=cw[4];
-        if(ot.fm2>0){doc.setTextColor(180,60,0);doc.text(fmtH(ot.fm2),xc,y+5);doc.setTextColor(20,20,40);}xc+=cw[5];
-        if(lm>0){doc.setTextColor(150,110,0);doc.text('-'+fmtH(lm/60),xc,y+5);doc.setTextColor(20,20,40);}
+        doc.text(tl,colX[1],y+5);doc.setTextColor(20,20,40);
+        doc.text(b.start+'-'+b.end+cx,colX[2],y+5);
+        doc.text(fmtHC(dur),colX[3],y+5);
+        if(ot.fm1>0){doc.setTextColor(200,100,0);doc.text(fmtHC(ot.fm1),colX[4],y+5);doc.setTextColor(20,20,40);}
+        if(ot.fm2>0){doc.setTextColor(180,60,0);doc.text(fmtHC(ot.fm2),colX[5],y+5);doc.setTextColor(20,20,40);}
+        if(lm>0){doc.setTextColor(150,110,0);doc.text('-'+fmtHC(lm/60),colX[6],y+5);doc.setTextColor(20,20,40);}
         y+=7;ri++;
-        if(y>260){doc.addPage();y=20;}
+        if(y>255){
+          doc.addPage();y=20;
+          // Repeat header row on new page
+          doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
+          sfb();doc.setFontSize(7);doc.setTextColor(50,60,80);
+          hdrs.forEach((h,i)=>{doc.text(h,colX[i],y+4);});
+          y+=6;
+        }
       });
-      // day subtotal
+      // day subtotal — clear pipe-separated summary, compact durations
       doc.setFillColor(230,236,245);doc.rect(M,y,W-2*M,6,'F');
       sfb();doc.setFontSize(7);doc.setTextColor(40,50,80);
-doc.text('Çalışma: '+fmtH(dw)+'   Seyahat: '+fmtH(dt2)+(ld>0?'   Öğle: -'+fmtH(ld):'')+(df1>0?'   FM-1: '+fmtH(df1):'')+(df2>0?'   FM-2: '+fmtH(df2):''),M+2,y+4);
+      const subParts=['Çalışma: '+fmtH(dw),'Seyahat: '+fmtH(dt2)];
+      if(ld>0) subParts.push('Öğle: -'+fmtH(ld));
+      if(df1>0) subParts.push('FM-1: '+fmtH(df1));
+      if(df2>0) subParts.push('FM-2: '+fmtH(df2));
+      doc.text(subParts.join('    /    '),M+2,y+4);
       y+=7;
-      if(y>260){doc.addPage();y=20;}
+      if(y>255){
+        doc.addPage();y=20;
+        doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
+        sfb();doc.setFontSize(7);doc.setTextColor(50,60,80);
+        hdrs.forEach((h,i)=>{doc.text(h,colX[i],y+4);});
+        y+=6;
+      }
     });
 
     // GRAND TOTAL
@@ -1637,13 +1677,68 @@ doc.text('Çalışma: '+fmtH(dw)+'   Seyahat: '+fmtH(dt2)+(ld>0?'   Öğle: -'+f
       sf();doc.setTextColor(120,80,0);doc.setFontSize(7);
       doc.text('Öğle arası toplam '+fmtH(tL)+' düşüldü (12:00–13:00)',M+2,y+4);y+=7;
     }
+
+    // ÇALIŞMA SAATİ TANIMLARI — colored info strip directly under the lunch
+    // note, matching its visual style (light tinted background + colored
+    // accent text), so it reads as part of the same "totals" block the
+    // customer already scanned, rather than a separate boxed section.
+    {
+      const lim=S.otLimit||'17:30';
+      const segs=[
+        {label:'Normal:', val:'08:00-'+lim+' (Pzt-Cum)',        lc:[20,90,45]},
+        {label:'FM-1:',   val:'06:00-08:00, '+lim+'-20:00',     lc:[170,95,0]},
+        {label:'FM-2:',   val:'20:00-06:00 + Hafta sonu/Tatil', lc:[165,40,35]},
+        {label:'Yol:',    val:'Sabit (haftanın tüm günleri)',   lc:[50,60,110]},
+      ];
+
+      sf();doc.setFontSize(6.3);
+      const availW=W-2*M;
+      // Measure to decide 1 vs 2 lines
+      let totalW=0;
+      segs.forEach(s=>{ totalW+=doc.getTextWidth(s.label+' '+s.val+'    '); });
+      const oneLine = totalW<=availW;
+      const lineH=4.3;
+      const stripH = (oneLine?1:2)*lineH + 3;
+
+      doc.setFillColor(232,241,251);
+      doc.rect(M,y,W-2*M,stripH,'F');
+
+      let xc=M+2, yy=y+3.6;
+      segs.forEach((s,i)=>{
+        const segW=doc.getTextWidth(s.label+' '+s.val+'    ');
+        if(!oneLine && xc+segW>M+availW-2){ xc=M+2; yy+=lineH; }
+        sfb();doc.setTextColor(s.lc[0],s.lc[1],s.lc[2]);
+        doc.text(s.label,xc,yy);
+        const lw=doc.getTextWidth(s.label+' ');
+        sf();doc.setTextColor(40,50,70);
+        doc.text(s.val,xc+lw,yy);
+        xc+=segW;
+      });
+
+      y+=stripH+2;
+    }
+
     y+=4;
     if(y>230){doc.addPage();y=20;}
 
-    // WORK DESC
+        // WORK DESC
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(9);
     doc.text('YAPILAN İŞLER VE NOTLAR',M+2,y+5);y+=11;
+    if(S.jobTitle&&S.jobTitle.trim()){
+      sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);
+      doc.text('İşin Tanımı: ',M,y);
+      sf();doc.setTextColor(30,30,30);
+      doc.text(S.jobTitle,M+22,y);
+      y+=6;
+    }
+    if(S.machineInfo&&S.machineInfo.trim()){
+      sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);
+      doc.text('Makine: ',M,y);
+      sf();doc.setTextColor(30,30,30);
+      doc.text(S.machineInfo,M+14,y);
+      y+=6;
+    }
     sf();doc.setFontSize(8);doc.setTextColor(30,30,30);
     const wl=doc.splitTextToSize(S.workDesc||'—',W-2*M);doc.text(wl,M,y);y+=wl.length*4.5+4;
     if(S.materials){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Kullanılan Parçalar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const ml=doc.splitTextToSize(S.materials,W-2*M);doc.text(ml,M,y);y+=ml.length*4.5+4;}
@@ -1667,7 +1762,7 @@ doc.text('Çalışma: '+fmtH(dw)+'   Seyahat: '+fmtH(dt2)+(ld>0?'   Öğle: -'+f
       doc.setPage(p);
       doc.setDrawColor(13,27,42);doc.line(M,284,W-M,284);
       sf();doc.setFontSize(6);doc.setTextColor(140,140,140);
-      doc.text('Ref: '+S.refNo+' | '+S.client+' | '+S.eng,M,288);
+      doc.text('Ref: '+S.refNo+'  -  '+S.client+'  -  '+S.eng,M,288);
       doc.text('Sayfa '+p+'/'+pages,W-M,288,{align:'right'});
     }
 
@@ -1701,7 +1796,7 @@ function sendMail(){
   S.selectedDays.forEach(ds=>{
     const d=new Date(ds+'T00:00:00');
     const dow=dayOfWeek(ds);
-    lines+=DN[dow]+' '+String(d.getDate()).padStart(2,'0')+'/'+(String(d.getMonth()+1).padStart(2,'0'))+':\n';
+    lines+=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()+' '+DN[dow]+':\n';
     (S.blocks[ds]||[]).forEach(b=>{
       const dur=tdiff(b.start,b.end);
       const ot=calcOT(b.start,b.end,S.otLimit,b.type,dow);
@@ -1715,15 +1810,19 @@ function sendMail(){
     const ld=dayLunch(ds);if(ld>0)lines+='  (Öğle -'+fmtH(ld)+')\n';
     lines+='\n';
   });
+  const hasSig=!!(S.sigDataUrl&&S.sigDataUrl.length>100)||!!(S.sigName&&S.sigName.trim());
+  const introLine=hasSig
+    ? (wn+'. hafta tarafınızca onaylanan/imzalanan saha servis raporu aşağıdaki gibidir. İmzalı PDF raporu ektedir.')
+    : (wn+'. hafta yapılan işler ve çalışma saatlerini içeren saha servis raporu detayları aşağıdaki gibidir. PDF raporu ektedir.');
   const body='Sayın '+(S.ctContact||'Yetkili')+',\n\n'
-    +'Hafta '+wn+' saha raporu asagidadir. PDF raporu ayrica eklenecektir.\n\n'
+    +introLine+'\n\n'
     +'--- RAPOR ---\n'
     +'Ref: '+S.refNo+'\nMühendis: '+S.eng+'\nMüşteri: '+S.client+'\nDurum: '+S.jobStatus+'\n\n'
     +'--- GÜNLÜK DETAY ---\n'+lines
     +'--- TOPLAM ---\n'
     +'Çalışma: '+fmtH(tw)+'\nSeyahat: '+fmtH(tt)
     +(tf1>0?'\nFM-1: '+fmtH(tf1):'')+(tf2>0?'\nFM-2: '+fmtH(tf2):'')+'\n\n'
-    +'--- YAPILAN İŞLER ---\n'+(S.workDesc||'-')+'\n'
+    +'--- YAPILAN İŞLER ---\n'+(S.jobTitle?'İşin Tanımı: '+S.jobTitle+'\n':'')+(S.machineInfo?'Makine: '+S.machineInfo+'\n':'')+((S.jobTitle||S.machineInfo)?'\n':'')+(S.workDesc||'-')+'\n'
     +(S.materials?'\nParçalar:\n'+S.materials+'\n':'')
     +(S.recommendations?'\nAksiyonlar:\n'+S.recommendations+'\n':'')
     +'\n'+(S.sigName?'Onaylayan: '+S.sigName+(S.sigTitle?' ('+S.sigTitle+')':'')+'\n':'')
@@ -2008,6 +2107,8 @@ function openReport(r){
     document.getElementById('otLimit').value=S.otLimit||'17:30';
     document.getElementById('refDisplay').textContent=S.refNo||'—';
     document.getElementById('refSub').textContent='Arşivden yüklendi';
+    document.getElementById('jobTitle').value=S.jobTitle||'';
+    document.getElementById('machineInfo').value=S.machineInfo||'';
     document.getElementById('workDesc').value=S.workDesc||'';
     document.getElementById('materials').value=S.materials||'';
     document.getElementById('recommendations').value=S.recommendations||'';
@@ -2073,7 +2174,7 @@ function startNewReport(){
   Object.assign(S,{
     eng:'',client:'',ctContact:'',ctEmail:'',otLimit:'17:30',
     refNo:'',weekOffset:0,extraWeeks:[],selectedDays:[],blocks:{},
-    workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
+    jobTitle:'',machineInfo:'',workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
     sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',pdfGenerated:false
   });
   showReportForm();
@@ -2084,6 +2185,8 @@ function startNewReport(){
   document.getElementById('ctEmail').value='';
   document.getElementById('refDisplay').textContent='—';
   document.getElementById('refSub').textContent='Hafta seçince oluşturulacak';
+  document.getElementById('jobTitle').value='';
+  document.getElementById('machineInfo').value='';
   document.getElementById('workDesc').value='';
   document.getElementById('materials').value='';
   document.getElementById('recommendations').value='';
