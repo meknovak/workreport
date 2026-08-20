@@ -805,7 +805,31 @@ const S={
 const MEM={};
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v!=null?JSON.parse(v):(MEM[k]!==undefined?MEM[k]:d);}catch{return MEM[k]!==undefined?MEM[k]:d;}}
 function lsSet(k,v){MEM[k]=v;try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
-function getSeq(wk){const m=lsGet('seq',{});if(!m[wk])m[wk]=0;m[wk]++;lsSet('seq',m);return m[wk];}
+// Determine the next sequence number for a given week by counting how many
+// SAVED reports (draft or completed) already exist for that week — rather
+// than trusting a separate counter that can drift out of sync if reports
+// are deleted or the counter storage gets cleared independently.
+function getSeq(wk){
+  const reports=lsGet('arc_reports',[]);
+  // wk is formatted like "26W32" (yr+W+weekNum). Count existing refs whose
+  // refNo matches that week+year pattern: "H32-XX-26"
+  const m=wk.match(/^(\d+)W(\d+)$/);
+  if(!m) return 1;
+  const yr=m[1], wn=m[2];
+  const prefix='H'+wn+'-';
+  const suffix='-'+yr;
+  let maxSeq=0;
+  reports.forEach(r=>{
+    if(r.refNo && r.refNo.startsWith(prefix) && r.refNo.endsWith(suffix)){
+      const parts=r.refNo.split('-');
+      if(parts.length===3){
+        const n=parseInt(parts[1],10);
+        if(!isNaN(n) && n>maxSeq) maxSeq=n;
+      }
+    }
+  });
+  return maxSeq+1;
+}
 
 const DEF_ENG=['Yusuf Özgül','Savaş Doğukan Gezen','Hamit Bayhan','İrfan Tunalı','Karani Tetik','Sedat Can','Teoman Fidan','Enes Karataş'];
 const DEF_CLI=['Ak Gıda İzmir','Ak Gıda Lüleburgaz','Ak Gıda Sakarya','Bahçıvan Lüleburgaz','Balkan Süt İzmir','Ekici Antalya','Gönenli Süt Akhisar','Gönenli Süt Balıkesir','SEK Süt Bursa','Sütaş Aksaray','Sütaş Bingöl','Sütaş Bursa','Sütaş İzmir','Yörsan Susurluk'];
@@ -974,11 +998,21 @@ function getWN(d){
   return Math.ceil((((dt-ys)/86400000)+1)/7);
 }
 function dateKey(d){
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  // Guard against any malformed Date (e.g. an accidental year-arithmetic
+  // bug elsewhere producing a tiny/absurd year) by always zero-padding the
+  // year to 4 digits. Without this, a stray Date with getFullYear()===5
+  // silently produced dateKey "5-01-01", which downstream parsed back as
+  // year 0005 and printed as "01/01/5" on the PDF/report.
+  const yr=String(d.getFullYear()).padStart(4,'0');
+  return yr+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function dayOfWeek(dateStr){
   // Returns 0=Mon…6=Sun
   const d=new Date(dateStr+'T00:00:00');
+  if(isNaN(d.getTime())){
+    console.error('[dayOfWeek] Invalid dateStr received:',dateStr);
+    return 0;
+  }
   return (d.getDay()+6)%7;
 }
 function fmtD(d){return d.toLocaleDateString('tr-TR',{day:'2-digit',month:'short'});}
@@ -1222,8 +1256,20 @@ function refreshBlk(ds,bi){
   }
 }
 
-function fmtH(h){const m=Math.round(h*60);const hh=Math.floor(m/60),mm=m%60;return mm===0?hh+' saat':hh+' saat '+mm+' dk';}
-function fmtHC(h){const m=Math.round(h*60);const hh=Math.floor(m/60),mm=m%60;return mm===0?hh+'sa':hh+'sa '+String(mm).padStart(2,'0')+'dk';}
+function fmtH(h){
+  const m=Math.round(h*60);const hh=Math.floor(m/60),mm=m%60;
+  if(hh===0&&mm===0) return '0 saat';
+  if(hh===0) return mm+' dk';
+  if(mm===0) return hh+' saat';
+  return hh+' saat '+mm+' dk';
+}
+function fmtHC(h){
+  const m=Math.round(h*60);const hh=Math.floor(m/60),mm=m%60;
+  if(hh===0&&mm===0) return '0sa';
+  if(hh===0) return mm+'dk';
+  if(mm===0) return hh+'sa';
+  return hh+'sa '+String(mm).padStart(2,'0')+'dk';
+}
 function toggleDD(ds){document.getElementById('ddhdr_'+ds).classList.toggle('open');document.getElementById('ddbody_'+ds).classList.toggle('open');}
 
 // ═══ TIME MATH ════════════════════════════════════════════════════════════
@@ -1568,7 +1614,10 @@ function genPDF(){
     y=30;
 
     // INFO TABLE
-    const info=[['Ref No',S.refNo],['Firma',S.client],['Yetkili',S.ctContact||'—'],['E-posta',S.ctEmail||'—'],['Servis Müh.',S.eng],['Hafta',String(wn)],['Durum',S.jobStatus]];
+    const info=[['Ref No',S.refNo],['Firma',S.client],['Yetkili',S.ctContact||'—'],['E-posta',S.ctEmail||'—'],['Servis Müh.',S.eng],['Hafta',String(wn)]];
+    if(S.jobTitle&&S.jobTitle.trim()) info.push(['İşin Tanımı',S.jobTitle]);
+    if(S.machineInfo&&S.machineInfo.trim()) info.push(['Makine',S.machineInfo]);
+    info.push(['Durum',S.jobStatus]);
     info.forEach((r,i)=>{
       doc.setFillColor(i%2===0?246:255,i%2===0?247:255,i%2===0?250:255);
       doc.rect(M,y,W-2*M,7,'F');
@@ -1719,32 +1768,21 @@ function genPDF(){
     }
 
     y+=4;
-    if(y>230){doc.addPage();y=20;}
+    // Only break to a new page here if we're genuinely near the bottom —
+    // this was firing too early (at 230mm) and stranding a mostly-empty
+    // page 1 while YAPILAN İŞLER jumped to page 2 unnecessarily.
+    if(y>265){doc.addPage();y=20;}
 
         // WORK DESC
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(9);
     doc.text('YAPILAN İŞLER VE NOTLAR',M+2,y+5);y+=11;
-    if(S.jobTitle&&S.jobTitle.trim()){
-      sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);
-      doc.text('İşin Tanımı: ',M,y);
-      sf();doc.setTextColor(30,30,30);
-      doc.text(S.jobTitle,M+22,y);
-      y+=6;
-    }
-    if(S.machineInfo&&S.machineInfo.trim()){
-      sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);
-      doc.text('Makine: ',M,y);
-      sf();doc.setTextColor(30,30,30);
-      doc.text(S.machineInfo,M+14,y);
-      y+=6;
-    }
     sf();doc.setFontSize(8);doc.setTextColor(30,30,30);
     const wl=doc.splitTextToSize(S.workDesc||'—',W-2*M);doc.text(wl,M,y);y+=wl.length*4.5+4;
     if(S.materials){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Kullanılan Parçalar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const ml=doc.splitTextToSize(S.materials,W-2*M);doc.text(ml,M,y);y+=ml.length*4.5+4;}
     if(S.recommendations){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Sonraki Aksiyonlar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const rl=doc.splitTextToSize(S.recommendations,W-2*M);doc.text(rl,M,y);y+=rl.length*4.5+4;}
-    sfb();doc.text('Durum: ',M,y);sf();doc.text(S.jobStatus,M+15,y);y+=14;
-    if(y>210){doc.addPage();y=20;}
+    y+=4;
+    if(y>250){doc.addPage();y=20;}
 
     // SIGNATURE
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
@@ -2100,7 +2138,10 @@ function renderHomeList(){
       +'</div>'
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'
         +'<div class="arc-date">'+dateStr+'</div>'
-        +'<button class="arc-del-btn" style="background:none;border:none;cursor:pointer;font-size:13px;opacity:.4;padding:2px 6px;" title="Sil">🗑️</button>'
+        +'<div style="display:flex;gap:4px;">'
+          +'<button class="arc-copy-btn" style="background:none;border:none;cursor:pointer;font-size:13px;opacity:.55;padding:2px 6px;" title="Kopyala">📄</button>'
+          +'<button class="arc-del-btn" style="background:none;border:none;cursor:pointer;font-size:13px;opacity:.4;padding:2px 6px;" title="Sil">🗑️</button>'
+        +'</div>'
       +'</div>';
     list.appendChild(card);
   });
@@ -2113,18 +2154,65 @@ function initHomeListDelegation(){
   list.dataset.bound='1';
   list.addEventListener('click', function(e){
     const delBtn=e.target.closest('.arc-del-btn');
+    const copyBtn=e.target.closest('.arc-copy-btn');
     const card=e.target.closest('.arc-card');
     if(!card) return;
     const id=card.dataset.reportId;
+    const reports=lsGet('arc_reports',[]);
+    const r=reports.find(rep=>rep.id===id);
     if(delBtn){
       e.stopPropagation();
       deleteReport(id);
       return;
     }
-    const reports=lsGet('arc_reports',[]);
-    const r=reports.find(rep=>rep.id===id);
+    if(copyBtn){
+      e.stopPropagation();
+      if(r) copyReport(r);
+      return;
+    }
     if(r) openReport(r);
   });
+}
+
+// Duplicate an existing report: keep customer/engineer/contact info, but
+// clear everything that's specific to the original week — days, hours,
+// work description, signature — so it opens as a fresh draft ready for a
+// new week's data entry without retyping the customer details.
+function copyReport(r){
+  showConfirm(
+    'Raporu Kopyala',
+    r.refNo+' — '+(r.client||'Müşteri')+' bilgileriyle yeni bir rapor oluşturulacak. Saatler, imza ve açıklamalar boş başlayacak.',
+    function(){
+      const src=r.state||{};
+      Object.assign(S,{
+        eng:src.eng||'', client:src.client||'', ctContact:src.ctContact||'', ctEmail:src.ctEmail||'',
+        otLimit:src.otLimit||'17:30',
+        refNo:'', _refWeekKey:'', weekOffset:0, extraWeeks:[], selectedDays:[], blocks:{},
+        jobTitle:'', machineInfo:'', workDesc:'', materials:'', recommendations:'', jobStatus:'Tamamlandı',
+        sigDataUrl:'', sigName:'', sigTitle:'', sigDT:'', pdfGenerated:false
+      });
+
+      fillSel('engSel',engineers,S.eng);
+      fillSel('clientSel',clients,S.client);
+      document.getElementById('ctContact').value=S.ctContact||'';
+      document.getElementById('ctEmail').value=S.ctEmail||'';
+      document.getElementById('otLimit').value=S.otLimit||'17:30';
+      document.getElementById('refDisplay').textContent='—';
+      document.getElementById('refSub').textContent='Hafta seçince oluşturulacak';
+      document.getElementById('jobTitle').value='';
+      document.getElementById('machineInfo').value='';
+      document.getElementById('workDesc').value='';
+      document.getElementById('materials').value='';
+      document.getElementById('recommendations').value='';
+      document.getElementById('sigName').value='';
+      document.getElementById('sigTitle').value='';
+      clearSigFull();
+
+      showReportForm();
+      goToStep(1); // skip straight to date/hours since customer info is prefilled
+      renderWeek();
+    }
+  );
 }
 
 function openReport(r){
