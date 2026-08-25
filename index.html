@@ -798,7 +798,12 @@ const S={
   eng:'',client:'',ctContact:'',ctEmail:'',otLimit:'17:30',
   refNo:'',weekOffset:0,extraWeeks:[],selectedDays:[],blocks:{},
   jobTitle:'',machineInfo:'',workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
-  sigDataUrl:'',sigName:'',sigTitle:'',sigDT:''
+  sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',
+  // Date shown in the PDF header ("Field Service Report — DD.MM.YYYY").
+  // Set ONCE the first time this report's PDF is generated, then reused
+  // on every later re-export so the report always shows when it was
+  // originally created — not "today" every time it's reopened and shared.
+  reportDate:''
 };
 
 // ═══ STORAGE ══════════════════════════════════════════════════════════════
@@ -972,7 +977,12 @@ function validate(n){
   if(n===3){
     S.sigName=document.getElementById('sigName').value;
     S.sigTitle=document.getElementById('sigTitle').value;
-    S.sigDT=document.getElementById('sigDT').value;
+    // Only overwrite the saved signature timestamp with what's in the DOM
+    // field if that field actually has a value. This prevents an empty
+    // input (e.g. right after reopening a completed report without ever
+    // visiting the signature step) from wiping out the original sigDT.
+    const dtVal=document.getElementById('sigDT').value;
+    if(dtVal) S.sigDT=dtVal;
   }
   return true;
 }
@@ -1302,11 +1312,21 @@ function calcOT(s, e, lim, blockType, di){
   const sM=toMin(s);
   let eM=toMin(e);
   if(eM<=sM) eM+=1440; // midnight crossing
-  const totalH=(eM-sM)/60;
   const isWeekend=(di===5||di===6); // Sat=5, Sun=6
 
-  // Weekend work: all = FM-2
-  if(isWeekend) return {fm1:0, fm2:totalH};
+  // Lunch (12:00–13:00) is deducted from whichever window(s) it actually
+  // falls inside — this must happen PER WINDOW, not just once against a
+  // single bucket, otherwise weekend blocks (single fm2 bucket) or blocks
+  // spanning multiple windows end up reporting the lunch-inflated raw
+  // duration as overtime instead of the net (lunch-deducted) duration that
+  // GENEL TOPLAM and the day-subtotal rows already show.
+
+  // Weekend work: entire block = FM-2, minus any lunch overlap
+  if(isWeekend){
+    const totalH=(eM-sM)/60;
+    const lm=lunchMin(s,e)/60;
+    return {fm1:0, fm2:Math.max(0,totalH-lm)};
+  }
 
   // Weekday work — split by time windows
   // Windows (in minutes from midnight):
@@ -1316,7 +1336,6 @@ function calcOT(s, e, lim, blockType, di){
   // limM–20:00  → FM-1
   // 20:00–24:00 → FM-2
   // 24:00–30:00 (=next 00–06) → FM-2
-
   const W=[
     {from:0,    to:360,   type:'fm2'},  // 00:00–06:00
     {from:360,  to:480,   type:'fm1'},  // 06:00–08:00
@@ -1331,14 +1350,15 @@ function calcOT(s, e, lim, blockType, di){
     const overlapStart=Math.max(sM, w.from);
     const overlapEnd  =Math.min(eM, w.to);
     if(overlapEnd<=overlapStart) return;
-    const h=(overlapEnd-overlapStart)/60;
+    let h=(overlapEnd-overlapStart)/60;
+    // Deduct any lunch minutes that fall within THIS specific window,
+    // not just the FM-1 window as before — fixes the case where the
+    // lunch hour overlaps a Normal/FM-2 window instead.
+    const lunchHereMin=lunchOverlapInRange(s,e,w.from,w.to)/60;
+    h=Math.max(0,h-lunchHereMin);
     if(w.type==='fm1') fm1+=h;
     else if(w.type==='fm2') fm2+=h;
   });
-
-  // Deduct lunch from FM-1 window if it falls there
-  const lm=lunchOverlapInRange(s,e,toMin(lim),1200)/60; // lunch in FM-1 range
-  fm1=Math.max(0,fm1-lm);
 
   return {fm1, fm2};
 }
@@ -1608,7 +1628,8 @@ function genPDF(){
     doc.setTextColor(255,255,255);sfb();doc.setFontSize(14);
     doc.text('SAHA ÇALIŞMA RAPORU',M,9);
     doc.setFontSize(8);sf();doc.setTextColor(245,166,35);
-    doc.text('Field Service Report    '+new Date().toLocaleDateString('tr-TR'),M,15);
+    if(!S.reportDate) S.reportDate=new Date().toLocaleDateString('tr-TR');
+    doc.text('Field Service Report    '+S.reportDate,M,15);
     doc.setTextColor(180,195,215);
     doc.text('Ref: '+S.refNo+'   Mühendis: '+S.eng+'   Hafta: '+wn,W-M,15,{align:'right'});
     y=30;
@@ -1782,7 +1803,20 @@ function genPDF(){
     if(S.materials){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Kullanılan Parçalar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const ml=doc.splitTextToSize(S.materials,W-2*M);doc.text(ml,M,y);y+=ml.length*4.5+4;}
     if(S.recommendations){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Sonraki Aksiyonlar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const rl=doc.splitTextToSize(S.recommendations,W-2*M);doc.text(rl,M,y);y+=rl.length*4.5+4;}
     y+=4;
-    if(y>250){doc.addPage();y=20;}
+    // Only break to a new page if the SIGNATURE block itself won't fit —
+    // compute its real height instead of using a fixed guess, so a short
+    // signature (just a name, no drawn image) never gets stranded alone
+    // on an otherwise-empty new page while page 1 still has room.
+    {
+      let sigBlockH=11; // header bar
+      if(S.sigDataUrl&&S.sigDataUrl.length>100) sigBlockH+=33;
+      if(S.sigName) sigBlockH+=6;
+      if(S.sigTitle) sigBlockH+=5;
+      if(S.sigDT) sigBlockH+=5;
+      if(!S.sigDataUrl&&!S.sigName) sigBlockH+=5; // "İmza alınmamıştır" line
+      const PAGE_BOTTOM=280; // leave room for the footer line at 284/288
+      if(y+sigBlockH>PAGE_BOTTOM){doc.addPage();y=20;}
+    }
 
     // SIGNATURE
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
@@ -2189,7 +2223,7 @@ function copyReport(r){
         otLimit:src.otLimit||'17:30',
         refNo:'', _refWeekKey:'', weekOffset:0, extraWeeks:[], selectedDays:[], blocks:{},
         jobTitle:'', machineInfo:'', workDesc:'', materials:'', recommendations:'', jobStatus:'Tamamlandı',
-        sigDataUrl:'', sigName:'', sigTitle:'', sigDT:'', pdfGenerated:false
+        sigDataUrl:'', sigName:'', sigTitle:'', sigDT:'', pdfGenerated:false, reportDate:''
       });
 
       fillSel('engSel',engineers,S.eng);
@@ -2238,6 +2272,13 @@ function openReport(r){
     document.getElementById('jobStatus').value=S.jobStatus||'Tamamlandı';
     document.getElementById('sigName').value=S.sigName||'';
     document.getElementById('sigTitle').value=S.sigTitle||'';
+    // Restore the ORIGINAL signature timestamp so re-opening a completed
+    // report and going back to "Düzenle" → Önizleme doesn't silently
+    // overwrite it with "now". Without this the PDF's signed date kept
+    // changing every time the report was reopened and re-exported.
+    if(S.sigDT){
+      document.getElementById('sigDT').value=S.sigDT;
+    }
     updateOTInfo();
     renderWeek();
 
@@ -2298,7 +2339,7 @@ function startNewReport(){
     eng:'',client:'',ctContact:'',ctEmail:'',otLimit:'17:30',
     refNo:'',weekOffset:0,extraWeeks:[],selectedDays:[],blocks:{},
     jobTitle:'',machineInfo:'',workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
-    sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',pdfGenerated:false
+    sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',pdfGenerated:false,reportDate:''
   });
   showReportForm();
   goToStep(0);
