@@ -1384,12 +1384,26 @@ function conflicts(ds){
       if(aS<bE&&bS<aE)w.push('Blok '+(i+1)+' ve '+(j+1)+' çakışıyor');
     }
   }
-  // seq order
+  // seq order — when a block crosses midnight (end <= start), its end time
+  // is expressed as minutes-past-midnight of the SAME clock day it started
+  // (e.g. 09:00→00:30 becomes 540→1470, representing "00:30 the next day").
+  // The next block's start time must be compared on that same extended
+  // timeline: if it's a small clock time (e.g. 00:30) that's actually a
+  // continuation into the next day, it needs +1440 added too, otherwise
+  // 30 gets compared against 1470 and always looks "too early" even when
+  // the blocks correctly follow one another.
   for(let i=0;i<blocks.length-1;i++){
     const a=blocks[i],b=blocks[i+1];
-    if(!a.end||!b.start)continue;
-    let aE=toMin(a.end);if(aE<=toMin(a.start))aE+=1440;
-    if(toMin(b.start)<aE-1)w.push('Blok '+(i+1)+' bitiş > Blok '+(i+2)+' başlangıç');
+    if(!a.start||!a.end||!b.start)continue;
+    let aE=toMin(a.end);
+    const aCrossedMidnight=aE<=toMin(a.start);
+    if(aCrossedMidnight)aE+=1440;
+    let bS=toMin(b.start);
+    // If block A already crossed into the next day, block B's start time
+    // (a small clock value like 00:30) is on that same next day too —
+    // extend it the same way before comparing.
+    if(aCrossedMidnight && bS<toMin(a.start)) bS+=1440;
+    if(bS<aE-1)w.push('Blok '+(i+1)+' bitiş > Blok '+(i+2)+' başlangıç');
   }
   // logic
   const fw=blocks.findIndex(b=>b.type==='work');
@@ -1485,7 +1499,9 @@ function buildPreview(){
       const T=BT[b.type];
       bgs+='<span class="badge '+T.bcls+'">'+T.label+' '+b.start+'–'+b.end+' ('+fmtH(dur)+')</span> ';
     });
-    if(ld>0)bgs+='<span class="badge" style="background:#FFF3CD;color:#856404;">🍽️ Öğle -'+fmtH(ld)+'</span>';
+    // Öğle badge intentionally removed — the lunch hour is already invisibly
+    // deducted from whichever badge (Normal/FM-1/FM-2) it overlapped, same
+    // as the PDF, so a separate "-1sa" badge here would be redundant.
     const item=document.createElement('div');item.className='dsi';
     // Full date: Pazartesi, 01/06/2026
     const dd2=String(d.getDate()).padStart(2,'0');
@@ -1657,9 +1673,9 @@ function genPDF(){
     // TABLE HEADER
     // Column widths — widened FM-1/FM-2/Öğle so compact durations never collide.
     // Total = 182mm, fits within the usable page width (W-2*M ≈ 182mm).
-    const cw=[40,18,34,22,24,24,20];
+    const cw=[38,16,32,22,22,22,22];
     const colX=[M+2]; for(let i=0;i<cw.length;i++) colX.push(colX[i]+cw[i]);
-    const hdrs=['Gün/Tarih','Tür','Saat Aralığı','Net Süre','FM-1','FM-2','Öğle'];
+    const hdrs=['Gün/Tarih','Tür','Saat Aralığı','Net Süre','Normal','FM-1','FM-2'];
     doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
     sfb();doc.setFontSize(7);doc.setTextColor(50,60,80);
     hdrs.forEach((h,i)=>{doc.text(h,colX[i],y+4);});
@@ -1693,10 +1709,20 @@ function genPDF(){
         if(b.type==='work')doc.setTextColor(20,80,160);else if(b.type==='ret')doc.setTextColor(30,120,50);else doc.setTextColor(150,70,0);
         doc.text(tl,colX[1],y+5);doc.setTextColor(20,20,40);
         doc.text(b.start+'-'+b.end+cx,colX[2],y+5);
+        // Net Süre — total duration for this block, lunch already deducted
         doc.text(fmtHC(dur),colX[3],y+5);
-        if(ot.fm1>0){doc.setTextColor(200,100,0);doc.text(fmtHC(ot.fm1),colX[4],y+5);doc.setTextColor(20,20,40);}
-        if(ot.fm2>0){doc.setTextColor(180,60,0);doc.text(fmtHC(ot.fm2),colX[5],y+5);doc.setTextColor(20,20,40);}
-        if(lm>0){doc.setTextColor(150,110,0);doc.text('-'+fmtHC(lm/60),colX[6],y+5);doc.setTextColor(20,20,40);}
+        if(b.type==='work'){
+          // Normal = net duration minus whatever fell into FM-1/FM-2 —
+          // lunch is already deducted inside dur/ot.fm1/ot.fm2, so this
+          // column never needs a separate "-1sa" lunch line: the hour is
+          // simply absent from whichever bucket it overlapped.
+          const normalH=Math.max(0,dur-ot.fm1-ot.fm2);
+          if(normalH>0){doc.setTextColor(30,110,50);doc.text(fmtHC(normalH),colX[4],y+5);doc.setTextColor(20,20,40);}
+          if(ot.fm1>0){doc.setTextColor(200,100,0);doc.text(fmtHC(ot.fm1),colX[5],y+5);doc.setTextColor(20,20,40);}
+          if(ot.fm2>0){doc.setTextColor(180,60,0);doc.text(fmtHC(ot.fm2),colX[6],y+5);doc.setTextColor(20,20,40);}
+        }
+        // Travel (Gidiş/Dönüş): Net Süre already shown above; no Normal/FM
+        // split applies to travel, so the remaining columns stay blank.
         y+=7;ri++;
         if(y>255){
           doc.addPage();y=20;
@@ -1710,8 +1736,12 @@ function genPDF(){
       // day subtotal — clear pipe-separated summary, compact durations
       doc.setFillColor(230,236,245);doc.rect(M,y,W-2*M,6,'F');
       sfb();doc.setFontSize(7);doc.setTextColor(40,50,80);
-      const subParts=['Çalışma: '+fmtH(dw),'Seyahat: '+fmtH(dt2)];
-      if(ld>0) subParts.push('Öğle: -'+fmtH(ld));
+      // Only show parts that actually have a nonzero value — a day that's
+      // pure travel shouldn't say "Çalışma: 0 saat", and a pure work day
+      // shouldn't say "Seyahat: 0 saat". Nothing to show, nothing printed.
+      const subParts=[];
+      if(dw>0) subParts.push('Çalışma: '+fmtH(dw));
+      if(dt2>0) subParts.push('Seyahat: '+fmtH(dt2));
       if(df1>0) subParts.push('FM-1: '+fmtH(df1));
       if(df2>0) subParts.push('FM-2: '+fmtH(df2));
       doc.text(subParts.join('    /    '),M+2,y+4);
@@ -2172,9 +2202,9 @@ function renderHomeList(){
       +'</div>'
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'
         +'<div class="arc-date">'+dateStr+'</div>'
-        +'<div style="display:flex;gap:4px;">'
-          +'<button class="arc-copy-btn" style="background:none;border:none;cursor:pointer;font-size:13px;opacity:.55;padding:2px 6px;" title="Kopyala">📄</button>'
-          +'<button class="arc-del-btn" style="background:none;border:none;cursor:pointer;font-size:13px;opacity:.4;padding:2px 6px;" title="Sil">🗑️</button>'
+        +'<div style="display:flex;gap:6px;">'
+          +'<button class="arc-copy-btn" style="background:#EEF3F9;border:1px solid #D7E2EC;border-radius:8px;cursor:pointer;font-size:17px;padding:6px 10px;line-height:1;" title="Kopyala">📄</button>'
+          +'<button class="arc-del-btn" style="background:#FDEEEE;border:1px solid #F3D4D4;border-radius:8px;cursor:pointer;font-size:17px;padding:6px 10px;line-height:1;" title="Sil">🗑️</button>'
         +'</div>'
       +'</div>';
     list.appendChild(card);
@@ -2256,6 +2286,16 @@ function openReport(r){
 
   showConfirm(title, sub, function(){
     Object.assign(S, r.state);
+    // Backward compatibility: reports saved before reportDate existed have
+    // no such field in their stored state, so it comes back undefined —
+    // which the "if(!S.reportDate)" check in genPDF() treats as unset and
+    // fills in with TODAY every single time. For an already-completed
+    // report, fall back to its original save timestamp so the date still
+    // stops drifting on every re-export, instead of only fixing this for
+    // reports created after the update.
+    if(!S.reportDate && r.savedAt){
+      S.reportDate=new Date(r.savedAt).toLocaleDateString('tr-TR');
+    }
 
     fillSel('engSel',engineers,S.eng);
     fillSel('clientSel',clients,S.client);
