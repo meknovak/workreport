@@ -1639,22 +1639,50 @@ function genPDF(){
     const sf=()=>doc.setFont(F,'normal');
     const sfb=()=>doc.setFont(F,'bold');
 
-    // HEADER
+    // Write an array of pre-wrapped text lines starting at the current y,
+    // automatically paging when the block reaches the bottom margin —
+    // instead of dumping the whole block in one doc.text() call (which
+    // silently clips anything past the page edge and then advances y by
+    // the FULL block height regardless, leaving a phantom gap on the next
+    // page). Returns the updated y.
+    function writeLines(lines, x, startY, lineH){
+      let yy=startY;
+      const BOTTOM=280;
+      for(let i=0;i<lines.length;i++){
+        if(yy>BOTTOM){
+          doc.addPage();
+          yy=20;
+        }
+        doc.text(lines[i], x, yy);
+        yy+=lineH;
+      }
+      return yy;
+    }
+
+    // HEADER — original size/position restored exactly (22mm band, y=30
+    // after). Only the right-aligned Ref/Mühendis/Hafta block changes:
+    // now stacked as three separate right-aligned lines in a larger font
+    // instead of one small single line, for readability.
     doc.setFillColor(13,27,42);doc.rect(0,0,W,22,'F');
     doc.setTextColor(255,255,255);sfb();doc.setFontSize(14);
     doc.text('SAHA ÇALIŞMA RAPORU',M,9);
     doc.setFontSize(8);sf();doc.setTextColor(245,166,35);
     if(!S.reportDate) S.reportDate=new Date().toLocaleDateString('tr-TR');
     doc.text('Field Service Report    '+S.reportDate,M,15);
-    doc.setTextColor(180,195,215);
-    doc.text('Ref: '+S.refNo+'   Mühendis: '+S.eng+'   Hafta: '+wn,W-M,15,{align:'right'});
+    sfb();doc.setFontSize(9);doc.setTextColor(255,255,255);
+    doc.text('Ref: '+S.refNo,W-M,8,{align:'right'});
+    doc.text('Mühendis: '+S.eng,W-M,13.5,{align:'right'});
+    doc.text('Hafta: '+wn,W-M,19,{align:'right'});
     y=30;
 
-    // INFO TABLE
-    const info=[['Ref No',S.refNo],['Firma',S.client],['Yetkili',S.ctContact||'—'],['E-posta',S.ctEmail||'—'],['Servis Müh.',S.eng],['Hafta',String(wn)]];
+    // INFO TABLE — Ref No / Servis Müh. / Hafta removed from here since
+    // they're now shown prominently in the header band above. Durum moved
+    // down to right after YAPILAN İŞLER, closer to where its outcome is
+    // actually described. What's left is just what's unique to this
+    // table: who the customer contact is and what job/machine this was.
+    const info=[['Firma',S.client],['Yetkili',S.ctContact||'—'],['E-posta',S.ctEmail||'—']];
     if(S.jobTitle&&S.jobTitle.trim()) info.push(['İşin Tanımı',S.jobTitle]);
     if(S.machineInfo&&S.machineInfo.trim()) info.push(['Makine',S.machineInfo]);
-    info.push(['Durum',S.jobStatus]);
     info.forEach((r,i)=>{
       doc.setFillColor(i%2===0?246:255,i%2===0?247:255,i%2===0?250:255);
       doc.rect(M,y,W-2*M,7,'F');
@@ -1673,9 +1701,9 @@ function genPDF(){
     // TABLE HEADER
     // Column widths — widened FM-1/FM-2/Öğle so compact durations never collide.
     // Total = 182mm, fits within the usable page width (W-2*M ≈ 182mm).
-    const cw=[38,16,32,22,22,22,22];
+    const cw=[34,15,29,20.8,20.8,20.8,20.8,20.8];
     const colX=[M+2]; for(let i=0;i<cw.length;i++) colX.push(colX[i]+cw[i]);
-    const hdrs=['Gün/Tarih','Tür','Saat Aralığı','Net Süre','Normal','FM-1','FM-2'];
+    const hdrs=['Gün/Tarih','Tür','Saat Aralığı','Net Süre','Normal','FM-1','FM-2','Seyahat'];
     doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
     sfb();doc.setFontSize(7);doc.setTextColor(50,60,80);
     hdrs.forEach((h,i)=>{doc.text(h,colX[i],y+4);});
@@ -1684,7 +1712,7 @@ function genPDF(){
     doc.setDrawColor(200,205,215);
     for(let i=1;i<cw.length;i++){ doc.line(colX[i]-2,y-6,colX[i]-2,y); }
 
-    let tw=0,tt=0,tf1=0,tf2=0,tL=0,ri=0;
+    let tw=0,tt=0,tf1=0,tf2=0,tL=0,dayIdx=0;
     S.selectedDays.forEach(ds=>{
       const d=new Date(ds+'T00:00:00');
       const dow=dayOfWeek(ds);
@@ -1692,9 +1720,17 @@ function genPDF(){
       const bls=S.blocks[ds]||[];
       const ld=dayLunch(ds);tL+=ld;
       let dw=0,dt2=0,df1=0,df2=0;
+      const dayStartY=y; // remember where this day's rows begin, for the divider line after
       bls.forEach((b,bi)=>{
-        if(ri%2===0){doc.setFillColor(252,252,250);}else{doc.setFillColor(255,255,255);}
+        // Shading now alternates PER DAY, not per block-row, so a day with
+        // 2-3 blocks (Gidiş/Çalışma/Dönüş) reads as one visual group
+        // instead of a zebra-striped mix of unrelated rows.
+        if(dayIdx%2===0){doc.setFillColor(255,255,255);}else{doc.setFillColor(234,239,246);}
         doc.rect(M,y,W-2*M,7,'F');
+        // Column separator lines running the height of this row, so the
+        // grid reads clearly rather than relying on background tint alone.
+        doc.setDrawColor(210,215,225);
+        for(let ci=1;ci<cw.length;ci++){ doc.line(colX[ci]-2,y,colX[ci]-2,y+7); }
         const dur=tdiff(b.start,b.end);
         const lm=lunchMin(b.start,b.end);
         const ot=calcOT(b.start,b.end,S.otLimit,b.type,di);
@@ -1720,10 +1756,12 @@ function genPDF(){
           if(normalH>0){doc.setTextColor(30,110,50);doc.text(fmtHC(normalH),colX[4],y+5);doc.setTextColor(20,20,40);}
           if(ot.fm1>0){doc.setTextColor(200,100,0);doc.text(fmtHC(ot.fm1),colX[5],y+5);doc.setTextColor(20,20,40);}
           if(ot.fm2>0){doc.setTextColor(180,60,0);doc.text(fmtHC(ot.fm2),colX[6],y+5);doc.setTextColor(20,20,40);}
+        } else {
+          // Travel (Gidiş/Dönüş): shown in its own "Yol" column, never
+          // mixed into Normal/FM-1/FM-2 — travel is always flat-rate.
+          doc.setTextColor(150,70,0);doc.text(fmtHC(dur),colX[7],y+5);doc.setTextColor(20,20,40);
         }
-        // Travel (Gidiş/Dönüş): Net Süre already shown above; no Normal/FM
-        // split applies to travel, so the remaining columns stay blank.
-        y+=7;ri++;
+        y+=7;
         if(y>255){
           doc.addPage();y=20;
           // Repeat header row on new page
@@ -1733,19 +1771,16 @@ function genPDF(){
           y+=6;
         }
       });
-      // day subtotal — clear pipe-separated summary, compact durations
-      doc.setFillColor(230,236,245);doc.rect(M,y,W-2*M,6,'F');
-      sfb();doc.setFontSize(7);doc.setTextColor(40,50,80);
-      // Only show parts that actually have a nonzero value — a day that's
-      // pure travel shouldn't say "Çalışma: 0 saat", and a pure work day
-      // shouldn't say "Seyahat: 0 saat". Nothing to show, nothing printed.
-      const subParts=[];
-      if(dw>0) subParts.push('Çalışma: '+fmtH(dw));
-      if(dt2>0) subParts.push('Seyahat: '+fmtH(dt2));
-      if(df1>0) subParts.push('FM-1: '+fmtH(df1));
-      if(df2>0) subParts.push('FM-2: '+fmtH(df2));
-      doc.text(subParts.join('    /    '),M+2,y+4);
-      y+=7;
+      // Slightly heavier divider line marking the end of this day's block
+      // group, reinforcing the per-day shading above.
+      doc.setDrawColor(160,168,182);
+      doc.setLineWidth(0.5);
+      doc.line(M,y,W-M,y);
+      doc.setLineWidth(0.2);
+      dayIdx++;
+      // Day-subtotal row removed — the table's Normal/FM-1/FM-2/Seyahat
+      // columns already show this same information per block, so a
+      // repeated text summary line per day was redundant.
       if(y>255){
         doc.addPage();y=20;
         doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
@@ -1791,13 +1826,13 @@ function genPDF(){
         {label:'Yol:',    val:'Sabit (haftanın tüm günleri)',   lc:[50,60,110]},
       ];
 
-      sf();doc.setFontSize(6.3);
+      sf();doc.setFontSize(7);
       const availW=W-2*M;
       // Measure to decide 1 vs 2 lines
       let totalW=0;
       segs.forEach(s=>{ totalW+=doc.getTextWidth(s.label+' '+s.val+'    '); });
       const oneLine = totalW<=availW;
-      const lineH=4.3;
+      const lineH=4.8;
       const stripH = (oneLine?1:2)*lineH + 3;
 
       doc.setFillColor(232,241,251);
@@ -1815,24 +1850,44 @@ function genPDF(){
         xc+=segW;
       });
 
-      y+=stripH+2;
+      y+=stripH+1;
     }
 
-    y+=4;
+    y+=2;
     // Only break to a new page here if we're genuinely near the bottom —
     // this was firing too early (at 230mm) and stranding a mostly-empty
     // page 1 while YAPILAN İŞLER jumped to page 2 unnecessarily.
     if(y>265){doc.addPage();y=20;}
 
-        // WORK DESC
+        // WORK DESC — text now flows across pages line-by-line via writeLines()
+    // instead of being dumped in one call, so a long description/parts/
+    // recommendations block continues immediately where it left off on
+    // the next page instead of leaving a large gap when it happened to
+    // trigger a page break partway through.
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(9);
     doc.text('YAPILAN İŞLER VE NOTLAR',M+2,y+5);y+=11;
     sf();doc.setFontSize(8);doc.setTextColor(30,30,30);
-    const wl=doc.splitTextToSize(S.workDesc||'—',W-2*M);doc.text(wl,M,y);y+=wl.length*4.5+4;
-    if(S.materials){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Kullanılan Parçalar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const ml=doc.splitTextToSize(S.materials,W-2*M);doc.text(ml,M,y);y+=ml.length*4.5+4;}
-    if(S.recommendations){sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Sonraki Aksiyonlar:',M,y);y+=4;sf();doc.setTextColor(30,30,30);const rl=doc.splitTextToSize(S.recommendations,W-2*M);doc.text(rl,M,y);y+=rl.length*4.5+4;}
-    y+=4;
+    const wl=doc.splitTextToSize(S.workDesc||'—',W-2*M);
+    y=writeLines(wl,M,y,4.5)+2.5;
+    if(S.materials){
+      if(y>280){doc.addPage();y=20;}
+      sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Kullanılan Parçalar:',M,y);y+=3.5;
+      sf();doc.setTextColor(30,30,30);
+      const ml=doc.splitTextToSize(S.materials,W-2*M);
+      y=writeLines(ml,M,y,4.5)+2.5;
+    }
+    if(S.recommendations){
+      if(y>280){doc.addPage();y=20;}
+      sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Sonraki Aksiyonlar:',M,y);y+=3.5;
+      sf();doc.setTextColor(30,30,30);
+      const rl=doc.splitTextToSize(S.recommendations,W-2*M);
+      y=writeLines(rl,M,y,4.5)+2.5;
+    }
+    if(y>280){doc.addPage();y=20;}
+    sfb();doc.setFontSize(8);doc.setTextColor(40,50,80);doc.text('Durum: ',M,y);
+    sf();doc.setTextColor(30,30,30);doc.text(S.jobStatus,M+15,y);
+    y+=8;
     // Only break to a new page if the SIGNATURE block itself won't fit —
     // compute its real height instead of using a fixed guess, so a short
     // signature (just a name, no drawn image) never gets stranded alone
@@ -1844,18 +1899,24 @@ function genPDF(){
       if(S.sigTitle) sigBlockH+=5;
       if(S.sigDT) sigBlockH+=5;
       if(!S.sigDataUrl&&!S.sigName) sigBlockH+=5; // "İmza alınmamıştır" line
-      const PAGE_BOTTOM=280; // leave room for the footer line at 284/288
+      // Bottom margin loosened to 287mm (right against the footer rule at
+      // ~288mm) — the previous 280mm cutoff was stranding short signature
+      // blocks onto an otherwise-empty new page even when they clearly fit
+      // in the remaining ~30-35mm of page 1.
+      const PAGE_BOTTOM=287;
       if(y+sigBlockH>PAGE_BOTTOM){doc.addPage();y=20;}
     }
 
-    // SIGNATURE
+    // SIGNATURE — name/title/date first, signature image below (restored
+    // to the original order; this was accidentally flipped in an earlier
+    // change and should not have been).
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(9);
     doc.text('MÜŞTERİ ONAY / İMZA',M+2,y+5);y+=11;
-    if(S.sigDataUrl&&S.sigDataUrl.length>100){try{doc.addImage(S.sigDataUrl,'PNG',M,y,70,30);}catch{}y+=33;}
     if(S.sigName){sfb();doc.setFontSize(10);doc.setTextColor(20,20,40);doc.text(S.sigName,M,y);y+=6;}
     if(S.sigTitle){sf();doc.setFontSize(9);doc.setTextColor(60,70,90);doc.text(S.sigTitle,M,y);y+=5;}
     if(S.sigDT){sf();doc.setFontSize(8);doc.setTextColor(100,110,120);doc.text('Tarih: '+new Date(S.sigDT).toLocaleString('tr-TR'),M,y);y+=5;}
+    if(S.sigDataUrl&&S.sigDataUrl.length>100){try{doc.addImage(S.sigDataUrl,'PNG',M,y,70,30);}catch{}y+=33;}
     if(!S.sigDataUrl&&!S.sigName){sf();doc.setTextColor(160,160,160);doc.setFontSize(8);doc.text('İmza alınmamıştır',M,y);}
 
     // FOOTER
