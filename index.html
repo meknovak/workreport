@@ -624,6 +624,27 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
 .hkd-sumrow.total{font-size:15px;font-weight:700;color:var(--navy);border-bottom:none;border-top:2px solid var(--navy);margin-top:4px;padding-top:9px;}
 .hkd-note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:4px;}
 .arc-hkd-btn{background:#EAF3EE;border:1px solid #CFE6D8;border-radius:8px;cursor:pointer;font-size:15px;padding:6px 9px;line-height:1;}
+/* ── Yol / Yakıt bilgi kartı ─────────────────────────────────────── */
+.yk-box{background:#fff;border-radius:14px;width:100%;max-width:560px;margin:auto;overflow:hidden;--ykm:#0f5c8a;--yks:#e6f0f6;}
+.yk-box.yakit{--ykm:#e8780c;--yks:#fdefe0;}
+.yk-hdr{background:var(--ykm);color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:15px;}
+.yk-hdr button{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 11px;font-size:14px;cursor:pointer;}
+.yk-body{padding:12px 14px 14px;}
+.yk-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;}
+.yk-grid label{font-size:11px;font-weight:600;color:var(--navy2);display:block;}
+.yk-grid label>input,.yk-grid label>select,.yk-hm{margin-top:3px;}
+.yk-hm{display:flex;gap:5px;align-items:center;}
+.yk-calc{font-size:12px;background:var(--yks);border-radius:8px;padding:8px 10px;margin:10px 0;color:var(--navy);}
+#ykCanvas{width:100%;height:auto;border:1px solid var(--border);border-radius:8px;display:block;background:#fff;}
+.yk-det{border:1px dashed var(--border);border-radius:8px;padding:9px 10px;margin-top:9px;background:#FAFAF8;}
+.yk-det summary{font-size:13px;font-weight:700;color:var(--navy);cursor:pointer;}
+.yk-det textarea{height:64px;font-size:12px;margin:6px 0;}
+.yk-hint{font-size:11.5px;color:var(--muted);margin:6px 0 0;line-height:1.4;}
+.yk-actions{display:flex;gap:8px;margin-top:12px;}
+.yk-actions button{flex:1;padding:13px;border-radius:10px;font-size:15px;font-weight:700;font-family:var(--f);cursor:pointer;border:2px solid var(--ykm);background:#fff;color:var(--ykm);}
+.yk-actions .yk-save{background:var(--ykm);color:#fff;}
+.hkd-add-card{width:100%;margin-top:6px;background:#fff;color:var(--navy);border:1.5px solid var(--navy);border-radius:8px;font-size:13px;font-weight:700;font-family:var(--f);padding:8px 14px;cursor:pointer;}
+.hkd-r-card.has{background:#E3F1E5;border-color:#2E7D32;}
 </style>
 </head>
 <body>
@@ -3452,6 +3473,7 @@ function renderExpenses(){
     html+='<div class="hkd-cat-hdr"><span>'+c.label+'</span><span class="hkd-cat-total">'+totLabel+'</span></div>';
     items.forEach((it,idx)=>{ html+=renderReceiptRow(c.key,it,idx); });
     html+='<button type="button" class="badd hkd-add-receipt" data-cat="'+c.key+'" style="width:100%;">+ '+(c.key==='harcirah'?'Harcırah Ekle':'Masraf Ekle')+'</button>';
+    if(c.key==='yakit'||c.key==='otoyol') html+='<button type="button" class="hkd-add-card" data-cat="'+c.key+'">🧾 Bilgi Kartıyla Ekle</button>';
     html+='</div>';
   });
   box.innerHTML=html;
@@ -3521,6 +3543,7 @@ function renderReceiptRow(cat,it,idx){
     +'<select class="hkd-r-vat">'+opt(0.20,'KDV %20')+opt(0.10,'KDV %10')+opt(0.01,'KDV %1')+opt(0,"KDV'siz")+'</select>'
     +dateField+noteField
     +'<label class="hkd-photo-btn">📷<input type="file" accept="image/*" class="hkd-r-photo"></label>'
+    +((cat==='yakit'||cat==='otoyol')?'<button type="button" class="hkd-photo-btn hkd-r-card'+(it.card?' has':'')+'" title="Bilgi kartı oluştur / düzenle">🧾</button>':'')
     +'<button type="button" class="hkd-r-del">✕</button>'
     +breakdown+thumb+'</div>';
 }
@@ -3578,6 +3601,14 @@ function initHkdExpenseDelegation(){
       renderExpenses(); renderHakedisCalc();
       return;
     }
+    const addCard=e.target.closest('.hkd-add-card');
+    if(addCard){ YK.open(addCard.dataset.cat,-1); return; }
+    const cardBtn=e.target.closest('.hkd-r-card');
+    if(cardBtn){
+      const row=cardBtn.closest('.hkd-receipt-row');
+      YK.open(row.dataset.cat,parseInt(row.dataset.idx,10));
+      return;
+    }
     const delBtn=e.target.closest('.hkd-r-del');
     if(delBtn){
       const row=delBtn.closest('.hkd-receipt-row');
@@ -3604,6 +3635,7 @@ function initHkdExpenseDelegation(){
     if(e.target.classList.contains('hkd-r-gtutar')) it.gunlukTutar=parseDecimal(e.target.value);
     if(e.target.classList.contains('hkd-r-date-input')) it.date=e.target.value;
     if(e.target.classList.contains('hkd-r-note')) it.note=e.target.value;
+    if(it.card) YK.sync(cat,it);
     renderHakedisCalc();
     updateCatTotalDisplay(cat);
     if(e.target.classList.contains('hkd-r-amount')) updateReceiptBreakdown(row,cat,idx);
@@ -3630,10 +3662,11 @@ function initHkdExpenseDelegation(){
     if(e.target.classList.contains('hkd-r-date-input')){
       it.date=e.target.value;
     }
+    if(it.card && !e.target.classList.contains('hkd-r-photo')){ YK.sync(cat,it); scheduleHkdAutosave(); }
     if(e.target.classList.contains('hkd-r-photo')){
       const file=e.target.files&&e.target.files[0]; if(!file)return;
       compressImage(file,1280,0.72).then(function(dataUrl){
-        it.photo=dataUrl;
+        it.photo=dataUrl; delete it.card;
         renderExpenses(); renderHakedisCalc();
       }).catch(function(){ alert('Fotoğraf işlenemedi, tekrar deneyin.'); });
     }
@@ -3720,6 +3753,7 @@ function genHakedisPDF(){
   btn.textContent='⏳ Oluşturuluyor…'; btn.disabled=true;
   try{
     syncHkdFromDOM();
+    if(window.YK) YK.refreshAll(); // eski biçimde kaydedilmiş bilgi kartlarını güncel görünüme çevir
     if(!window.jspdf) throw new Error('jsPDF yüklenmedi');
     const{jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
@@ -3921,6 +3955,9 @@ function genHakedisPDF(){
       doc.setFillColor(13,27,42);doc.rect(0,0,W,16,'F');
       sfb();doc.setTextColor(255,255,255);doc.setFontSize(11);
       doc.text(label+' Masraf Detayı'+(pageNum>1?' (Sayfa '+pageNum+')':''),M,10);
+      // Müşteri + hak ediş no, başlığın sağında (bilgi kartlarında artık yazmıyor).
+      if(H.client){ sfb();doc.setFontSize(8.5);doc.text(String(H.client).slice(0,48),W-M,H.refNo?7:10,{align:'right'}); }
+      if(H.refNo){ sf();doc.setFontSize(7.5);doc.text('Hak Ediş: '+H.refNo,W-M,H.client?12:10,{align:'right'}); }
     }
     // Category-level rollup (KDV Dahil / KDV / KDV'siz for the WHOLE
     // category, not a single fiş) — shown once, right under the banner,
@@ -4102,7 +4139,8 @@ function layoutSmallReceiptsUnified(doc, items, sf, sfb, W, M, startY, catLabel,
     yy=22;
   }
   const noPhoto=items.filter(function(it){ return !it.photo; });
-  const withPhoto=items.filter(function(it){ return it.photo; });
+  const cardItems=items.filter(function(it){ return it.photo && it.card; });
+  const withPhoto=items.filter(function(it){ return it.photo && !it.card; });
 
   noPhoto.forEach(function(it){
     const needed=(items.length>1?5:0)+13;
@@ -4129,6 +4167,27 @@ function layoutSmallReceiptsUnified(doc, items, sf, sfb, W, M, startY, catLabel,
     sfb();doc.setFontSize(8.5);doc.setTextColor(15,95,45);
     doc.text('KDV\'siz: '+fmtTL(round2(net)),M+2+prefixW,yy+10.5);
     yy+=15;
+  });
+
+  // Bilgi kartları (YK modülü) yatay ve geniş — 2 sütunlu fiş ızgarasına
+  // sıkıştırılınca okunmaz oluyor, bu yüzden sayfa genişliğinde basılır.
+  // Tarih / tutar / KDV dökümü kartın kendi içinde yazdığı için ayrıca
+  // alt yazı satırı eklenmez.
+  cardItems.forEach(function(it){
+    const iw=W-2*M; let ih=iw*0.34;
+    try{ const p=doc.getImageProperties(it.photo); ih=iw*p.height/p.width; }catch(e){}
+    const lab=items.length>1?5:0;
+    if(yy+lab+ih+4>286) newPage();
+    if(lab){
+      sfb();doc.setFontSize(8.5);doc.setTextColor(20,50,90);
+      doc.text('Fiş '+(items.indexOf(it)+1),M+2,yy+4);
+      yy+=lab;
+    }
+    try{
+      doc.addImage(it.photo,'JPEG',M,yy,iw,ih);
+      doc.setDrawColor(210,215,225);doc.rect(M,yy,iw,ih);
+    }catch(e){console.warn('Card embed failed:',e);}
+    yy+=ih+4;
   });
 
   if(withPhoto.length){
@@ -5854,6 +5913,425 @@ function initTeklifDelegation(){
 // Always start at the home dashboard
 showHome();
 </script>
+<!-- YOL / YAKIT BİLGİ KARTI -->
+<div class="pdf-modal-overlay" id="ykOverlay" style="align-items:flex-start;overflow-y:auto;padding:12px;">
+  <div class="yk-box" id="ykBox">
+    <div class="yk-hdr"><span id="ykTitle"></span><button type="button" id="ykClose">✕</button></div>
+    <div class="yk-body">
+      <div class="yk-grid" id="ykForm"></div>
+      <div class="yk-calc" id="ykCalc"></div>
+      <canvas id="ykCanvas" width="1260" height="420"></canvas>
+      <details class="yk-det">
+        <summary>📋 Excel'den satır yapıştır</summary>
+        <p class="yk-hint" id="ykPasteHint"></p>
+        <textarea id="ykPaste" placeholder="Excel'de satırları seçip kopyalayın, buraya yapıştırın"></textarea>
+        <button type="button" class="badd" id="ykPasteBtn">Satırları al</button>
+      </details>
+      <details class="yk-det">
+        <summary>🖼️ Ekran görüntüsünden oku</summary>
+        <p class="yk-hint">Uygulama ekran görüntüsünü veya fiş fotoğrafını seçin; okunan bilgiler forma yazılır. İnternet bağlantısı gerekir. Okunan değerleri mutlaka kontrol edin.</p>
+        <input type="file" id="ykShot" accept="image/*" style="margin-top:6px;">
+      </details>
+      <p class="yk-hint" id="ykMsg" style="font-weight:600;color:var(--navy);"></p>
+      <div class="yk-actions">
+        <button type="button" id="ykCancel">İptal</button>
+        <button type="button" class="yk-save" id="ykSave">Kartı Kaydet</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// ═══ YOL / YAKIT BİLGİ KARTI ═════════════════════════════════════════════
+// Hak Ediş'teki Yakıt ve Otoyol masraf satırları için, elle girilen / Excel'den
+// yapıştırılan / ekran görüntüsünden okunan bilgilerden MekNovak formatında bir
+// bilgi kartı görseli üretir. Kart, satırın fotoğrafı (it.photo) olarak saklanır
+// ve PDF'te tam genişlikte basılır; kartın verisi it.card içinde durur, böylece
+// sonradan yeniden açılıp düzenlenebilir. Bilgi amaçlıdır, fiş yerine geçmez.
+window.YK=(function(){
+'use strict';
+const TH={otoyol:{main:'#0f5c8a',soft:'#e6f0f6',title:'Otoyol Geçiş Özeti',what:'HGS geçiş'},
+          yakit:{main:'#e8780c',soft:'#fdefe0',title:'Yakıt Alım Özeti',what:'akaryakıt alım'}};
+const FIELDS={
+  otoyol:[['giris','Giriş gişesi',{list:'gise'}],['cikis','Çıkış gişesi',{list:'gise'}],
+          ['gTarih','Giriş tarihi',{type:'date'}],['gSaat','Giriş saati',{type:'time'}],
+          ['cTarih','Çıkış tarihi',{type:'date'}],['cSaat','Çıkış saati',{type:'time'}],
+          ['otoyol','Otoyol',{list:'otoyol'}],['tutar','Ücret (TL, KDV dahil)',{num:1}],
+          ['plaka','Plaka',{list:'plaka'}],['tip','Geçiş tipi',{list:'tip'}]],
+  yakit:[['plaka','Plaka',{list:'plaka'}],['tur','Yakıt türü',{select:['Motorin (Dizel)','Benzin']}],
+         ['tarih','Tarih',{type:'date'}],['saat','Saat',{type:'time'}],
+         ['istasyon','İstasyon'],['yer','İl / İlçe',{list:'yer'}],
+         ['litre','Miktar (litre)',{num:1}],['birim','Birim fiyat (TL/lt, KDV dahil)',{num:1}],
+         ['tutar','Tutar (KDV dahil, otomatik)',{num:1}]]
+};
+const DEFAULT_LISTS={
+  plaka:['03 AFY 640'], tip:['HGS','OGS'],
+  otoyol:['GOI','KMO Asya Kesimi','KMO Avrupa Kesimi','KCO','ANO'],
+  gise:['Bursa Batı','Akhisar','İzmir','Susurluk','Karacabey Doğu','Karacabey Batı','Orhangazi','Ovaakça','Saruhanlı','Kırkağaç','Turgutlu',
+        'Köprü Giriş ve Çıkış Gişeleri','Köprü Çıkış','Odayeri','Kurnaköy','Kurnaköy Alın Gişesi','Mermerciler','Mermerciler SGS','Demirciler SGS','D100 SGS',
+        'Kargo','Terminal','Terminal 1 Yanyol','Terminal 2 Yanyol','KMO Kınalı Gişesi','KMO Çatalca Gişesi','Fatih Alın Gişesi',
+        'Niğde Alın (G33)','Emirler (G14)','Kırşehir (G22B)','Ortaköy (G23)'],
+  yer:['Bursa','Nilüfer / Bursa']
+};
+const $=id=>document.getElementById(id);
+let cat='otoyol', idx=-1, rec={}, bound=false;
+
+// ── yardımcılar ──
+const num=s=>{ if(s==null||s==='') return NaN; if(typeof s==='number') return s; s=String(s).trim().replace(/\s|₺|TL/gi,'');
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); return parseFloat(s); };
+const dec=n=>isNaN(n)?'—':n.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const tl=n=>isNaN(n)?'—':dec(n)+' ₺';
+const zaman=(d,t)=>{ const m=(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return [m?m[3]+'.'+m[2]+'.'+m[1]:(d||''), t||''].filter(Boolean).join(' ')||'—'; };
+const toISO=s=>{ const m=(s||'').match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+  return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):''; };
+const toSaat=s=>{ const m=(s||'').match(/(\d{1,2}):(\d{2})/); return m?m[1].padStart(2,'0')+':'+m[2]:''; };
+const rateOf=r=>(r&&r.vat!=null)?r.vat:0.20;
+const kdv=(a,rate)=>{ const h=Math.round(a/(1+rate)*100)/100; return {haric:h,kdv:Math.round((a-h)*100)/100}; };
+const fold=x=>(x||'').toLocaleLowerCase('tr').replace(/ı/g,'i').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ö/g,'o').replace(/[^a-z0-9]/g,'');
+const fixPlaka=p=>{ p=(p||'').replace(/\s+/g,'').toUpperCase().replace(/^O(?=\d)/,'0'); if(/^\d[A-Z]/.test(p)) p='0'+p;
+  const m=p.match(/^(\d{2})([A-Z]+)(\d+)$/); return m?m[1]+' '+m[2]+' '+m[3]:p; };
+const money=s=>{ const n=num(s); return isNaN(n)?'':dec(n); };
+function amount(r,c){ let a=num(r.tutar); if(isNaN(a)&&c==='yakit') a=Math.round(num(r.litre)*num(r.birim)*100)/100; return a; }
+
+// ── seçenek listeleri (yeni yazılanlar cihazda hatırlanır) ──
+function extras(){ try{ return lsGet('mn_yk_lists',{})||{}; }catch(e){ return {}; } }
+function listOf(k){ return DEFAULT_LISTS[k].concat(extras()[k]||[]); }
+function remember(k,v){
+  v=(v||'').trim(); if(!v||!DEFAULT_LISTS[k]) return;
+  if(listOf(k).some(x=>x.toLocaleLowerCase('tr')===v.toLocaleLowerCase('tr'))) return;
+  const e=extras(); (e[k]=e[k]||[]).push(v); try{ lsSet('mn_yk_lists',e); }catch(err){}
+}
+function fillListSelect(sel,v){
+  v=(v||'').trim(); const opts=listOf(sel.dataset.l).slice(), lc=x=>x.toLocaleLowerCase('tr');
+  const hit=opts.find(x=>lc(x)===lc(v)); if(hit) v=hit; else if(v) opts.push(v);
+  sel.innerHTML=''; sel.add(new Option('Seçin…',''));
+  opts.forEach(x=>sel.add(new Option(x,x)));
+  sel.add(new Option('Diğer (elle yaz)…','__other')); sel.value=v;
+  return v;
+}
+function swapField(el,tag){ const n=document.createElement(tag); ['k','l'].forEach(a=>n.dataset[a]=el.dataset[a]); el.replaceWith(n); return n; }
+function setField(k,v){ const el=document.querySelector('#ykForm [data-k="'+k+'"]'); if(el) el.value=v; }
+
+// ── form ──
+function renderForm(){
+  $('ykBox').className='yk-box '+cat;
+  $('ykTitle').textContent=(cat==='yakit'?'⛽ Yakıt':'🛣️ Otoyol')+' Bilgi Kartı';
+  $('ykPasteHint').textContent=cat==='otoyol'
+    ?'HGS Excel dosyasındaki satırları (Tahsilat Tarihi … Çıkış Tarihi, 8 sütun) yapıştırın. Tek satır forma yazılır; birden fazla satır ayrı masraf satırları olarak eklenir.'
+    :'Yakıt Excel dosyasındaki satırları tüm sütunlarıyla (tercihen başlık satırıyla birlikte) yapıştırın. Tek satır forma yazılır; birden fazla satır ayrı masraf satırları olarak eklenir.';
+  const box=$('ykForm');
+  box.innerHTML=FIELDS[cat].map(f=>{
+    const o=f[2]||{}, a='data-k="'+f[0]+'"';
+    if(o.select) return '<label>'+f[1]+'<select '+a+'></select></label>';
+    if(o.type==='date') return '<label>'+f[1]+'<input type="date" '+a+'></label>';
+    if(o.type==='time') return '<label>'+f[1]+'<span class="yk-hm"><select data-hm="'+f[0]+'" data-n="24"></select>:<select data-hm="'+f[0]+'" data-n="60"></select></span></label>';
+    if(o.list) return '<label>'+f[1]+'<select '+a+' data-l="'+o.list+'"></select></label>';
+    return '<label>'+f[1]+'<input type="text" '+a+(o.num?' inputmode="decimal"':'')+'></label>';
+  }).join('');
+  box.querySelectorAll('select[data-l]').forEach(sel=>{ rec[sel.dataset.k]=fillListSelect(sel,rec[sel.dataset.k]); });
+  box.querySelectorAll('select[data-k]:not([data-l])').forEach(sel=>{
+    const opts=FIELDS[cat].find(f=>f[0]===sel.dataset.k)[2].select.slice(), v=rec[sel.dataset.k];
+    if(v&&!opts.includes(v)) opts.push(v);
+    opts.forEach(x=>sel.add(new Option(x,x)));
+    if(!v) rec[sel.dataset.k]=opts[0];
+  });
+  box.querySelectorAll('[data-k]').forEach(inp=>inp.value=rec[inp.dataset.k]||'');
+  box.querySelectorAll('select[data-hm]').forEach(sel=>{
+    const n=+sel.dataset.n, parts=(rec[sel.dataset.hm]||'').split(':');
+    sel.add(new Option(n===24?'Saat':'Dk',''));
+    for(let x=0;x<n;x++){ const v=String(x).padStart(2,'0'); sel.add(new Option(v,v)); }
+    sel.value=(n===24?parts[0]:parts[1])||'';
+  });
+  refresh();
+}
+function refresh(){
+  const a=amount(rec,cat), k=kdv(a,rateOf(rec)), pct=Math.round(rateOf(rec)*100);
+  $('ykCalc').textContent=isNaN(a)?(cat==='yakit'?'Litre ve birim fiyatı girin; tutar ve KDV otomatik hesaplanır.':'Ücreti girin; KDV otomatik hesaplanır.')
+    :'KDV hariç '+tl(k.haric)+'  -  KDV (%'+pct+') '+tl(k.kdv)+'  -  KDV dahil '+tl(a);
+  draw(rec,cat);
+}
+function bind(){
+  if(bound) return; bound=true;
+  const box=$('ykForm');
+  box.addEventListener('input',e=>{
+    const t=e.target, k=t.dataset.k;
+    if(t.dataset.hm){
+      const b=t.parentNode.querySelectorAll('select'); if(b[0].value&&!b[1].value) b[1].value='00';
+      rec[t.dataset.hm]=b[0].value?b[0].value+':'+b[1].value:''; refresh(); return;
+    }
+    if(!k) return;
+    if(t.tagName==='SELECT'&&t.value==='__other'){ rec[k]=''; const n=swapField(t,'input'); n.type='text'; n.placeholder='Yazın'; n.focus(); refresh(); return; }
+    rec[k]=t.value;
+    if(cat==='yakit'&&(k==='litre'||k==='birim')){
+      const a=num(rec.litre)*num(rec.birim);
+      rec.tutar=isNaN(a)?'':dec(Math.round(a*100)/100); setField('tutar',rec.tutar);
+    }
+    if(k==='gTarih'&&t.value){ rec.cTarih=t.value; setField('cTarih',t.value); }
+    refresh();
+  });
+  box.addEventListener('focusout',e=>{
+    const t=e.target; if(!t.dataset.l||t.tagName!=='INPUT') return;
+    const v=t.value.trim(); remember(t.dataset.l,v);
+    rec[t.dataset.k]=fillListSelect(swapField(t,'select'),v); refresh();
+  });
+  $('ykClose').addEventListener('click',close);
+  $('ykCancel').addEventListener('click',close);
+  $('ykSave').addEventListener('click',save);
+  $('ykPasteBtn').addEventListener('click',onPaste);
+  $('ykShot').addEventListener('change',e=>{ const f=e.target.files&&e.target.files[0]; if(f) readShot(f).then(()=>{ e.target.value=''; }); });
+}
+
+// ── Excel'den yapıştırma ──
+const FUELCOLS={tarih:['satistarihi','islemtarihi','tarih'],saat:['satissaati','islemsaati','saat'],plaka:['aracplakasi','plaka'],
+  tur:['yakittipi','yakitturu','yakit'],litre:['litre'],birim:['birimfiyat','bfiyat'],tutar:['tutarkdvdahil','tutarvekdv'],
+  istasyon:['istasyonadi','istasyon'],yer:['istasyonilceil','iladi','il']};
+const FUEL_MULTINET={plaka:2,tur:7,tarih:8,saat:9,istasyon:10,yer:13,litre:14,birim:15,tutar:16};
+const FUEL_KISA={tarih:0,saat:1,plaka:4,tur:5,litre:6,birim:7,tutar:8,istasyon:9,yer:10};
+function parsePaste(text,c){
+  const out=[]; let hdr=null;
+  text.split(/\r?\n/).forEach(line=>{
+    const col=line.split('\t').map(x=>x.trim());
+    if(c==='otoyol'){
+      if(col.length<8||/tahsilat/i.test(col[0])||!/\d/.test(col[1])) return;
+      out.push({plaka:'03 AFY 640',tip:'HGS',tutar:money(col[1]),
+        otoyol:col[2].replace(/\s*GE[CÇ][Iİ][SŞ]\s*[UÜ]CRET[Iİ]?.*$/i,'').replace(/KESIMI/i,'Kesimi').replace(/ASYA/i,'Asya').replace(/AVRUPA/i,'Avrupa'),
+        giris:col[4],gTarih:toISO(col[5]),gSaat:toSaat(col[5]),cikis:col[6],cTarih:toISO(col[7]),cSaat:toSaat(col[7])});
+    }else{
+      if(col.some(x=>fold(x)==='litre')){
+        hdr={}; for(const k in FUELCOLS){ for(const n of FUELCOLS[k]){ const ix=col.findIndex(x=>fold(x)===n); if(ix>=0){ hdr[k]=ix; break; } } }
+        return;
+      }
+      const L=hdr||(col.length>=17?FUEL_MULTINET:col.length>=11?FUEL_KISA:null);
+      if(!L||!toISO(col[L.tarih])) return;
+      const g=k=>L[k]==null?'':(col[L[k]]||'');
+      const o={plaka:fixPlaka(g('plaka'))||'03 AFY 640',tur:/benz|kur[sş]unsuz/i.test(g('tur'))?'Benzin':'Motorin (Dizel)',
+        tarih:toISO(g('tarih')),saat:toSaat(g('saat')),istasyon:g('istasyon'),yer:g('yer'),litre:money(g('litre')),birim:money(g('birim')),tutar:money(g('tutar'))};
+      if(!o.tutar&&!isNaN(num(o.litre)*num(o.birim))) o.tutar=dec(Math.round(num(o.litre)*num(o.birim)*100)/100);
+      out.push(o);
+    }
+  });
+  return out;
+}
+function onPaste(){
+  const rows=parsePaste($('ykPaste').value,cat);
+  if(!rows.length){ $('ykMsg').textContent='Satır tanınamadı. Excel\'de satırı tüm sütunlarıyla seçip kopyaladığınızdan emin olun.'; return; }
+  $('ykPaste').value='';
+  if(rows.length===1){ rec=Object.assign({vat:rateOf(rec)},rows[0]); renderForm(); $('ykMsg').textContent='Satır forma yazıldı. Kontrol edip "Kartı Kaydet"e basın.'; return; }
+  rows.forEach(r=>{ r.vat=0.20; const it={amount:0,vat:0.20,date:'',photo:null}; applyTo(it,r,cat); H.expenses[cat].push(it); });
+  close(); renderExpenses(); renderHakedisCalc();
+}
+
+// ── ekran görüntüsünden okuma ──
+const DATE_RE=/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/, PLAKA_RE=/(?:^|[^A-Z0-9])([O0-9]\d?\s?[A-Z]{1,3}\s?\d{2,4})(?![0-9A-Za-z])/m;
+function findDT(text){
+  const out=[];
+  text.split('\n').forEach(x=>{ const r=x.replace(DATE_RE,''); if(DATE_RE.test(x)&&toSaat(r)) out.push({d:toISO(x),t:toSaat(r)}); });
+  if(!out.length){ const d=toISO(text), t=toSaat(text.replace(new RegExp(DATE_RE.source,'g'),'')); if(d||t) out.push({d:d,t:t}); }
+  return out;
+}
+function findPlaka(text){ const m=text.match(PLAKA_RE); return m?fixPlaka(m[1]):'03 AFY 640'; }
+function numTokens(text){
+  const out=[], re=/\d[\d.]*,\d{2,3}/g; let m;
+  while((m=re.exec(text))){
+    const raw=m[0], end=m.index+raw.length, vars=[];
+    (/,\d{3}$/.test(raw)?[raw,raw.slice(0,-1)]:[raw]).forEach(r=>{
+      vars.push([num(r),0]);
+      if(/^\d{2,}/.test(r)) vars.push([num(r.slice(1)),1]); // ₺ işareti rakam gibi okunmuş olabilir
+    });
+    out.push({raw:raw,vars:vars,before:text.slice(Math.max(0,m.index-4),m.index),after:text.slice(end,end+8),pos:m.index});
+  }
+  return out;
+}
+const litreHint=t=>/^\s*([l1I|]t\b|litre)/i.test(t.after);
+const priceHint=t=>/^\s*\S{0,2}\s*\/\s*[l1I|]t/i.test(t.after)||/x\s*$/i.test(t.before);
+function parseFuelText(text){
+  const T=numTokens(text); let best=null;
+  for(const a of T) for(const b of T) for(const c of T){
+    if(a===b||a===c||b===c) continue;
+    for(const va of a.vars) for(const vb of b.vars) for(const vc of c.vars){
+      const l=va[0], p=vb[0], t=vc[0];
+      if(!(l>0.5&&p>=20&&p<=400&&t>0)) continue;
+      const err=Math.abs(l*p-t)/t; if(err>0.001) continue;
+      const sc=va[1]+vb[1]+vc[1]+err*100-(litreHint(a)?.5:0)-(priceHint(b)?.5:0)+(priceHint(a)?.5:0)+(litreHint(b)?.5:0)+(l>p?.1:0);
+      if(!best||sc<best.sc) best={sc:sc,l:l,p:p,t:t};
+    }
+  }
+  if(!best){
+    const lt=T.find(litreHint), bi=text.search(/birim\s*fiyat/i);
+    const pt=T.find(x=>x!==lt&&priceHint(x))||(bi>=0?T.find(x=>x!==lt&&x.pos>bi):null);
+    const l=lt?lt.vars[0][0]:NaN, p=pt?pt.vars[0][0]:NaN;
+    if(isNaN(l)&&isNaN(p)&&!findDT(text).length) return null;
+    best={l:l,p:p,t:Math.round(l*p*100)/100};
+  }
+  const L=text.split('\n').map(x=>x.trim()).filter(Boolean), dt=findDT(text)[0]||{};
+  const clean=x=>(x||'').split(/\s+/).filter(w=>!/\d/.test(w)).join(' ').replace(/^[^A-Za-zÇĞİÖŞÜçğıöşü]+|[^A-Za-zÇĞİÖŞÜçğıöşü)]+$/g,'');
+  let ist='', i=L.findIndex(x=>/stasyon\s*$/i.test(x));
+  if(i>=0) ist=clean(L[i+1]);
+  if(!ist){ const c=L.map(x=>(x.match(/^[A-ZÇĞİÖŞÜ.&\s]{6,}/)||[''])[0].trim()).find(x=>x&&!/MOTOR|DIESEL|BENZ/.test(x)); ist=c||''; }
+  let yer=''; const ym=text.match(/([A-ZÇĞİÖŞÜ]{3,})\s*\/\s*([A-ZÇĞİÖŞÜ]{3,})/);
+  if(ym) yer=ym[1]+' / '+ym[2]; else { i=L.findIndex(x=>/^[iİıI]l$/i.test(x)); if(i>=0) yer=clean(L[i+1]); }
+  const f=n=>isNaN(n)?'':dec(n);
+  return {plaka:findPlaka(text),tur:/benz|kur[sş]unsuz/i.test(text)?'Benzin':'Motorin (Dizel)',tarih:dt.d||'',saat:dt.t||'',
+    istasyon:ist,yer:yer,litre:f(best.l),birim:f(best.p),tutar:f(best.t)};
+}
+function parseTollText(text){
+  const lab=re=>{ const m=text.match(new RegExp('^\\s*(?:'+re+')\\s*[:：]\\s*(.+)$','im')); return m?m[1].trim():''; };
+  const dts=findDT(text), g=dts[0]||{}, c=dts[1]||{};
+  let fee=lab('fee|[uü]cret|ge[cç]i[sş] [uü]creti|tutar').replace(/[^\d.,]/g,'');
+  if(!fee){ const m=text.match(/toplam\D*([\d.]+,\d{2})/i); fee=m?m[1]:''; }
+  const feeN=/\.\d{2}$/.test(fee)?parseFloat(fee.replace(/,/g,'')):num(fee);
+  let oto=lab('highway|otoyol').toUpperCase(); if(/^GO[L1I|]$/.test(oto)) oto='GOI';
+  const tip=(text.match(/\b(HGS|OGS)\b/)||[])[1]||'HGS';
+  const it={plaka:findPlaka(text),tip:tip,otoyol:oto,tutar:isNaN(feeN)?'':dec(feeN),
+    giris:lab('entry|giri[sş]|giri[sş] gi[sş]esi|giri[sş] istasyonu'),cikis:lab('exit|[cç][ıi]k[ıi][sş]|[cç][ıi]k[ıi][sş] gi[sş]esi|[cç][ıi]k[ıi][sş] istasyonu'),
+    gTarih:g.d||'',gSaat:g.t||'',cTarih:c.d||g.d||'',cSaat:c.t||''};
+  return (it.giris||it.cikis||it.tutar||it.gTarih)?it:null;
+}
+let ocrWorker=null;
+function loadScript(src){ return new Promise((ok,no)=>{ const el=document.createElement('script'); el.src=src; el.onload=ok; el.onerror=()=>no(new Error('okuma aracı indirilemedi')); document.head.appendChild(el); }); }
+async function readShot(file){
+  const st=$('ykMsg');
+  try{
+    st.textContent='Okuma aracı hazırlanıyor… (ilk seferde biraz sürer)';
+    if(!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+    if(!ocrWorker) ocrWorker=await Promise.race([Tesseract.createWorker(['tur','eng']),
+      new Promise((_,no)=>setTimeout(()=>no(new Error('okuma aracı indirilemedi')),90000))]);
+    st.textContent='Görsel okunuyor…';
+    const r=await ocrWorker.recognize(file);
+    const it=cat==='otoyol'?parseTollText(r.data.text):parseFuelText(r.data.text);
+    if(it){ rec=Object.assign({vat:rateOf(rec)},it); renderForm(); st.textContent='Bilgiler forma yazıldı. Görselle karşılaştırıp kontrol edin.'; }
+    else st.textContent='Görselden bilgi çıkarılamadı; elle girin.';
+  }catch(e){ st.textContent='Okunamadı ('+(e&&e.message||e)+'). İnternet bağlantısını kontrol edin.'; }
+}
+
+// ── kart çizimi ──
+const W=900, S=1.4, PAD=36, FONT='"Segoe UI",Roboto,system-ui,-apple-system,Arial,sans-serif';
+function fit(ctx,text,maxW){
+  text=String(text);
+  if(ctx.measureText(text).width<=maxW) return text;
+  while(text.length>1&&ctx.measureText(text+'…').width>maxW) text=text.slice(0,-1);
+  return text+'…';
+}
+function recOf(r,c){
+  const a=amount(r,c), v=kdv(a,rateOf(r)), pct=Math.round(rateOf(r)*100);
+  const money3=[['KDV hariç',tl(v.haric)],['KDV (%'+pct+')',tl(v.kdv)],['KDV dahil',tl(a)]];
+  if(c==='otoyol') return {head:(r.giris||'—')+'  →  '+(r.cikis||'—'),
+    rows:[[['Giriş zamanı',zaman(r.gTarih,r.gSaat)],['Çıkış zamanı',zaman(r.cTarih,r.cSaat)],['Otoyol',r.otoyol],['Geçiş tipi',r.tip],['Plaka',r.plaka]],
+          money3]};
+  return {head:r.istasyon||'—',
+    rows:[[['Tarih / Saat',zaman(r.tarih,r.saat)],['Plaka',r.plaka],['Yakıt türü',r.tur],['İl / İlçe',r.yer]],
+          [['Miktar',isNaN(num(r.litre))?'—':dec(num(r.litre))+' lt'],['Birim fiyat',isNaN(num(r.birim))?'—':dec(num(r.birim))+' ₺/lt']].concat(money3)]};
+}
+function paint(ctx,real,r,c,canvasH){
+  // Kartta ayrı bir başlık bandı yok: müşteri / hak ediş bilgisi PDF'te
+  // sayfanın kendi "… Masraf Detayı" başlığında yazıyor.
+  const T=TH[c], RH=56, a=amount(r,c), R=recOf(r,c);
+  let y=18;
+  if(real){
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,W,canvasH);
+    ctx.textBaseline='alphabetic';
+  }
+  if(real){
+    ctx.fillStyle=T.soft;ctx.fillRect(PAD,y,W-2*PAD,42);
+    ctx.fillStyle=T.main;ctx.fillRect(PAD,y,5,42);
+    ctx.textAlign='right';ctx.font='700 17px '+FONT;ctx.fillStyle='#1c2733';
+    const at=tl(a), aw=ctx.measureText(at).width; ctx.fillText(at,W-PAD-14,y+28);
+    ctx.textAlign='left';ctx.font='700 16px '+FONT;
+    ctx.fillText(fit(ctx,R.head,W-2*PAD-aw-60),PAD+18,y+28);
+  }
+  y+=42+6;
+  R.rows.forEach((row,ri)=>{
+    const cw=(W-2*PAD-18)/row.length;
+    row.forEach((cell,k)=>{
+      if(!real) return;
+      const cx=PAD+18+k*cw, v=String(cell[1]||'—');
+      ctx.textAlign='left';
+      ctx.fillStyle='#65717f';ctx.font='400 12.5px '+FONT;ctx.fillText(cell[0],cx,y+17);
+      ctx.fillStyle='#1c2733';let fs=16.5;
+      do{ctx.font='600 '+fs+'px '+FONT;fs-=.5;}while(fs>=11.5&&ctx.measureText(v).width>cw-14);
+      ctx.fillText(fit(ctx,v,cw-14),cx,y+40);
+    });
+    if(real&&ri>0){ctx.strokeStyle='#e3e7ec';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(PAD+18,y+.5);ctx.lineTo(W-PAD,y+.5);ctx.stroke();}
+    y+=RH;
+  });
+  y+=14;
+  if(real){
+    ctx.strokeStyle='#d9dee5';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(PAD,y+.5);ctx.lineTo(W-PAD,y+.5);ctx.stroke();
+    ctx.fillStyle='#65717f';ctx.textAlign='left';ctx.font='400 12.5px '+FONT;
+    ctx.fillText('Bilgi amaçlıdır. MekNovak tarafından '+T.what+' kayıtlarından derlenmiştir; fatura veya fiş yerine geçmez.',PAD,y+24);
+  }
+  return y+44;
+}
+function draw(r,c){
+  const cv=$('ykCanvas'), ctx=cv.getContext('2d');
+  const h=Math.ceil(paint(ctx,false,r,c,0));
+  cv.width=Math.round(W*S); cv.height=Math.round(h*S);
+  ctx.setTransform(S,0,0,S,0,0);
+  paint(ctx,true,r,c,h);
+  return cv;
+}
+function toJPEG(r,c){ return draw(r,c).toDataURL('image/jpeg',0.9); }
+
+// ── masraf satırına yazma ──
+function autoNote(r,c){
+  if(c==='otoyol') return [r.giris,r.cikis].filter(Boolean).join(' - ')+(r.otoyol?' ('+r.otoyol+')':'');
+  const l=num(r.litre); return (r.istasyon||'Yakıt')+(isNaN(l)?'':' - '+dec(l)+' lt');
+}
+function applyTo(it,r,c){
+  const a=amount(r,c), note=autoNote(r,c);
+  if(!it.note||(it.card&&it.note===it.card.autoNote)) it.note=note;
+  it.amount=isNaN(a)?0:Math.round(a*100)/100;
+  it.vat=rateOf(r);
+  it.date=(c==='otoyol'?r.gTarih:r.tarih)||it.date||'';
+  it.card=Object.assign({},r,{tutar:isNaN(a)?'':dec(a),autoNote:note,v:1});
+  it.photo=toJPEG(it.card,c);
+}
+function save(){
+  const a=amount(rec,cat);
+  if(isNaN(a)||a<=0){ $('ykMsg').textContent=cat==='yakit'?'Önce litre ve birim fiyatı (veya tutarı) girin.':'Önce ücreti girin.'; return; }
+  const list=H.expenses[cat];
+  const it=idx>=0&&list[idx]?list[idx]:{amount:0,vat:rateOf(rec),date:'',photo:null};
+  applyTo(it,rec,cat);
+  if(!(idx>=0&&list[idx])) list.push(it);
+  close(); renderExpenses(); renderHakedisCalc();
+}
+function close(){ $('ykOverlay').classList.remove('show'); }
+function start(c,i){
+  cat=c; idx=i;
+  const it=i>=0?H.expenses[c][i]:null;
+  if(it&&it.card) rec=JSON.parse(JSON.stringify(it.card));
+  else{
+    const prev=(H.expenses[c]||[]).slice().reverse().find(x=>x.card), pc=prev?prev.card:{};
+    rec={plaka:pc.plaka||'03 AFY 640'};
+    if(c==='otoyol'){ rec.tip=pc.tip||'HGS'; rec.otoyol=pc.otoyol||''; rec.giris=pc.cikis||''; rec.gTarih=rec.cTarih=(it&&it.date)||''; }
+    else{ rec.tur=pc.tur||'Motorin (Dizel)'; rec.tarih=(it&&it.date)||''; }
+    if(it&&parseFloat(it.amount)>0) rec.tutar=dec(parseFloat(it.amount));
+  }
+  rec.vat=it&&it.vat!=null?it.vat:rateOf(rec);
+  bind(); $('ykMsg').textContent=''; $('ykPaste').value='';
+  $('ykOverlay').querySelectorAll('details').forEach(d=>{ d.open=false; });
+  renderForm();
+  $('ykOverlay').classList.add('show'); $('ykOverlay').scrollTop=0;
+}
+// Satırı "kart" ile aç. Satırda gerçek bir fiş fotoğrafı varsa üzerine yazmadan önce sor.
+function open(c,i){
+  const it=i>=0?H.expenses[c][i]:null;
+  if(it&&it.photo&&!it.card){ showConfirm('Fotoğraf değişsin mi?','Bu satırdaki fiş fotoğrafı, oluşturacağınız bilgi kartıyla değiştirilecek.',function(){ start(c,i); }); return; }
+  start(c,i);
+}
+// Masraf satırındaki tutar / KDV / tarih elle değiştirilirse kart görseli de güncel kalsın.
+function sync(c,it){
+  if(!it||!it.card||!TH[c]) return;
+  const a=parseFloat(it.amount)||0;
+  it.card.tutar=dec(a); it.card.vat=it.vat!=null?it.vat:0.20;
+  if(it.date){ if(c==='otoyol'){ if(it.card.cTarih===it.card.gTarih) it.card.cTarih=it.date; it.card.gTarih=it.date; } else it.card.tarih=it.date; }
+  try{ it.photo=toJPEG(it.card,c); }catch(e){}
+}
+function refreshAll(){ ['yakit','otoyol'].forEach(function(c){ (H.expenses[c]||[]).forEach(function(it){ if(it.card) sync(c,it); }); }); }
+return {open:open,sync:sync,refreshAll:refreshAll,_parsePaste:parsePaste,_parseFuelText:parseFuelText,_parseTollText:parseTollText};
+})();
+</script>
+
 <!-- PDF READY MODAL -->
 <div class="pdf-modal-overlay" id="pdfModalOverlay">
   <div class="pdf-modal-box">
