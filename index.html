@@ -2015,6 +2015,17 @@ function showPDFReadyModal(url, fname, blob, mimeType){
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const canShareFiles = !!(navigator.share && navigator.canShare && blob);
 
+  // Paylaşım modunda görünen ikinci yol: "Doğrudan indir".
+  let alt=document.getElementById('pdfAltDownload');
+  if(!alt){
+    alt=document.createElement('a');
+    alt.id='pdfAltDownload'; alt.href='#';
+    alt.style.cssText='display:none;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--navy2);text-decoration:underline;cursor:pointer;';
+    alt.textContent='💾 Paylaşım açılmazsa: doğrudan indir';
+    link.parentNode.insertBefore(alt,link.nextSibling);
+  }
+  alt.style.display='none';
+
   const cleanup=()=>{
     overlay.classList.remove('show');
     setTimeout(()=>{ try{URL.revokeObjectURL(url);}catch{} },5000);
@@ -2028,10 +2039,25 @@ function showPDFReadyModal(url, fname, blob, mimeType){
       if(navigator.canShare({files:[file]})){
         sub.textContent='Dosyanız hazır: '+fname;
         link.textContent='📤 Paylaş / Kaydet';
+        // Paylaşım başarısız olursa (Chrome bazı dosya türlerini — örn. .json
+        // yedeği — paylaşmayı reddediyor) sessizce kapanmak yerine doğrudan
+        // indirmeye düşer. Kullanıcı paylaşım penceresini kendi kapattıysa
+        // (AbortError) pencere açık kalır, tekrar deneyebilir.
+        const directDownload=function(){
+          const a=document.createElement('a');
+          a.href=url; a.download=fname; a.style.display='none';
+          document.body.appendChild(a); a.click();
+          setTimeout(function(){ a.remove(); },1000);
+          sub.textContent='İndirme başlatıldı: '+fname;
+        };
+        alt.style.display='block';
+        alt.onclick=function(e){ e.preventDefault(); directDownload(); };
         link.onclick=function(e){
           e.preventDefault();
-          navigator.share({files:[file], title:fname}).catch(()=>{});
-          setTimeout(cleanup,500);
+          let p;
+          try{ p=navigator.share({files:[file], title:fname}); }catch(err){ directDownload(); return; }
+          p.then(function(){ setTimeout(cleanup,300); })
+           .catch(function(err){ if(err && err.name==='AbortError') return; directDownload(); });
         };
         overlay.classList.add('show');
         const closeBtn=document.getElementById('pdfModalCloseBtn');
