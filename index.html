@@ -2332,7 +2332,7 @@ function drawSahaRaporuBody(doc, st, F, sf, sfb){
   if(st.sigName){sfb();doc.setFontSize(10);doc.setTextColor(20,20,40);doc.text(st.sigName,M,y);y+=6;}
   if(st.sigTitle){sf();doc.setFontSize(9);doc.setTextColor(60,70,90);doc.text(st.sigTitle,M,y);y+=5;}
   if(st.sigDT){sf();doc.setFontSize(8);doc.setTextColor(100,110,120);doc.text('Tarih: '+new Date(st.sigDT).toLocaleString('tr-TR'),M,y);y+=5;}
-  if(st.sigDataUrl&&st.sigDataUrl.length>100){try{doc.addImage(st.sigDataUrl,'PNG',M,y,70,30);}catch(e){}y+=33;}
+  if(st.sigDataUrl&&st.sigDataUrl.length>100){try{doc.addImage(st.sigDataUrl,'PNG',M,y,70,30,undefined,'FAST');}catch(e){}y+=33;}
   if(!st.sigDataUrl&&!st.sigName){sf();doc.setTextColor(160,160,160);doc.setFontSize(8);doc.text('İmza alınmamıştır',M,y);}
 
   return y;
@@ -4195,15 +4195,23 @@ function genHakedisPDF(){
         drawCatBanner(label,pageNum);
         let yy=22;
         yy=drawCatTotalStrip(c.key,label,yy);
+        // Fatura niteliğindeki belgeler (otel, uçak, araç, diğer) A4 boyutunda
+        // olduğu için HER FATURA KENDİ SAYFASINDA basılır: "Fatura N" başlığı,
+        // tarih / tutar satırı ve görseli aynı sayfada, görsel sayfaya sığacak
+        // en büyük boyutta. Kategori toplamı yalnızca ilk sayfada durur.
+        // Görseli olmayan kalemler yer kaplamadığı için arka arkaya dizilir.
+        let prevHadPhoto=false, onPage=0;
         items.forEach(function(it,idx){
+          if(idx>0 && (prevHadPhoto || (it.photo && onPage>0))){ doc.addPage(); pageNum++; drawCatBanner(label,pageNum); yy=22; onPage=0; }
           const gross=parseFloat(it.amount)||0;
           const net = c.key==='otel' ? gross/(1+0.10+(it.vat2!=null?it.vat2:0.01)) : gross/(1+(it.vat!=null?it.vat:0));
           const vatAmt=gross-net;
           const needed=(items.length>1?5:0)+13;
-          if(yy+needed>264){ doc.addPage(); pageNum++; drawCatBanner(label,pageNum); yy=22; }
+          if(yy+needed>264){ doc.addPage(); pageNum++; drawCatBanner(label,pageNum); yy=22; onPage=0; }
+          prevHadPhoto=!!it.photo; onPage++;
           if(items.length>1){
             sfb();doc.setFontSize(8.5);doc.setTextColor(20,50,90);
-            doc.text('Fatura '+(idx+1),M+2,yy+4);
+            doc.text('Fatura '+(idx+1)+' / '+items.length,M+2,yy+4);
             yy+=5;
           }
           doc.setFillColor(246,247,250);
@@ -6063,9 +6071,13 @@ function initTeklifDelegation(){
 // KURAL: Dosyada yapılan HER değişiklikte APP_VERSION artırılır ve
 // APP_CHANGELOG'un başına bir kayıt eklenir. Büyük yeni özellik → ilk sayı
 // artar (7.0 → 8.0); düzeltme / küçük ekleme → ikinci sayı artar (7.0 → 7.1).
-// Dosya adı da aynı sürümü taşır: Saha_Raporu_Hak_Edis_Teklif_v7.0.html
-const APP_VERSION='7.0', APP_VERSION_DATE='11.10.2026';
+// Dosya adı da aynı sürümü taşır: Saha_Raporu_Hak_Edis_Teklif_v7.1.html
+const APP_VERSION='7.1', APP_VERSION_DATE='12.10.2026';
 const APP_CHANGELOG=[
+  {v:'7.1',d:'12.10.2026',items:[
+    'Hak ediş PDF: otel, uçak, araç ve diğer faturalarda her fatura kendi sayfasında, başlığı ve tutar satırıyla birlikte',
+    'PDF boyutu: imza görseli sıkıştırılarak ekleniyor (dosya çok daha küçük)'
+  ]},
   {v:'7.0',d:'11.10.2026',items:[
     'Yakıt ve otoyol için bilgi kartı: elle giriş, Excel\'den yapıştırma, ekran görüntüsünden okuma',
     'Fiş ve fatura fotoğrafından / PDF\'ten tutar, tarih, KDV ve açıklamanın otomatik doldurulması',
