@@ -6300,8 +6300,8 @@ function toJPEG(r,c){ return draw(r,c).toDataURL('image/jpeg',0.9); }
 
 // ── masraf satırına yazma ──
 function autoNote(r,c){
-  if(c==='otoyol') return [r.giris,r.cikis].filter(Boolean).join(' - ')+(r.otoyol?' ('+r.otoyol+')':'');
-  const l=num(r.litre); return (r.istasyon||'Yakıt')+(isNaN(l)?'':' - '+dec(l)+' lt');
+  if(c==='otoyol'){ const g=[r.giris,r.cikis].filter(Boolean).join(' - '); return (g?g+' ':'')+'Otoyol Masrafı'; }
+  return (r.plaka?r.plaka+' ':'')+'Şirket Aracı Yakıt';
 }
 function applyTo(it,r,c){
   const a=amount(r,c), note=autoNote(r,c);
@@ -6351,6 +6351,10 @@ function sync(c,it){
   const a=parseFloat(it.amount)||0;
   it.card.tutar=dec(a); it.card.vat=it.vat!=null?it.vat:0.20;
   if(it.date){ if(c==='otoyol'){ if(it.card.cTarih===it.card.gTarih) it.card.cTarih=it.date; it.card.gTarih=it.date; } else it.card.tarih=it.date; }
+  // Açıklama hâlâ otomatik üretilmiş haliyle duruyorsa (elle değiştirilmemişse) güncel kalıba çevir.
+  const n=autoNote(it.card,c);
+  if(!it.note||it.note===it.card.autoNote) it.note=n;
+  it.card.autoNote=n;
   try{ it.photo=toJPEG(it.card,c); }catch(e){}
 }
 function refreshAll(){ ['yakit','otoyol'].forEach(function(c){ (H.expenses[c]||[]).forEach(function(it){ if(it.card) sync(c,it); }); }); }
