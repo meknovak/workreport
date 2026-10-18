@@ -826,7 +826,11 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
     <div class="hkd-note" id="plEffectivePreview" style="margin-top:-4px;">Saatlik ücret: 0,00 TL</div>
     <div class="ig" style="margin-top:9px;"><label>Günlük Harcırah Tutarı (TL)</label><input type="text" inputmode="decimal" class="numdec" id="plHarcirah" placeholder="Ör: 1500" value="1500"/></div>
     <div class="ig"><label>Yol Zamanı Çarpanı</label><input type="text" inputmode="decimal" class="numdec" id="plTravelMult" placeholder="0.75" value="0.75"/></div>
-    <div class="ig"><label>Not (opsiyonel)</label><input type="text" id="plNote" placeholder="Ör: Ocak-Şubat-Mart dönemi"/></div>
+    <div class="ig"><label>Liste Tarihi (PDF'te yazan tarih)</label><input type="date" id="plDate"/></div>
+    <div class="ig"><label>Dönem (opsiyonel, PDF başlığında tarihin altında)</label><input type="text" id="plPeriod" placeholder="Ör: Ekim - Kasım - Aralık 2026"/></div>
+    <div class="ig"><label>Not (opsiyonel)</label><input type="text" id="plNote" placeholder="Ör: Liste 31.12.2026 tarihine kadar geçerlidir"/></div>
+    <div class="ig"><label>Şartlar / Açıklamalar (PDF'te "NOT" bölümü, her satır ayrı madde)</label><textarea id="plTerms" style="min-height:110px;font-size:13px;"></textarea>
+      <div class="hkd-note" style="margin-top:4px;">Tarife tipine göre hazır metin gelir; istediğiniz gibi değiştirebilirsiniz. <a href="#" id="plTermsReset">Varsayılana dön</a></div></div>
     <button class="btn btn-a" id="btnPlAdd" type="button">+ Kaydet</button>
     <button class="btn btn-g" id="btnPlCancelEdit" type="button" style="display:none;margin-top:6px;">İptal</button>
   </div>
@@ -1069,40 +1073,10 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
   </div>
 </div>
 
-<!-- STEP 4 -->
+<!-- STEP 4 — ÖNİZLEME (müşteriye gösterilir, imzadan önce) -->
 <div class="sec" id="s3">
-  <div class="sec-title">Onay & İmza</div>
-  <div class="sec-sub">Müşteri bilgileri. İmza opsiyoneldir.</div>
-  <div class="card">
-    <div class="ig"><label>Müşteri Adı Soyadı <span style="color:var(--muted);font-weight:400">(opsiyonel)</span></label>
-      <input type="text" id="sigName" placeholder="İmzalayan kişi"/></div>
-    <div class="ig"><label>Ünvan <span style="color:var(--muted);font-weight:400">(opsiyonel)</span></label>
-      <input type="text" id="sigTitle" placeholder="Müdür, Mühendis…"/></div>
-  </div>
-  <div class="card"><div class="clabel">Tarih & Saat</div>
-    <input type="datetime-local" id="sigDT"/></div>
-  <div class="card">
-    <div class="clabel">Dijital İmza</div>
-    <div id="sigPrevWrap" style="display:none;margin-bottom:10px;">
-      <img id="sigPrevImg" style="max-height:70px;border-radius:8px;border:1.5px solid var(--border);display:block;"/>
-      <div style="font-size:11px;color:var(--ok);margin-top:4px;">✅ İmza alındı</div>
-    </div>
-    <div id="sigNoPrev" style="font-size:12px;color:var(--muted);margin-bottom:10px;">Henüz imza alınmadı</div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-a" style="flex:1;margin-top:0;" onclick="openSigModal()">✍️ İmza Al / Düzenle</button>
-      <button class="btn btn-g" style="margin-top:0;width:auto;padding:10px 14px;" onclick="clearSigFull()" title="Sil">🗑️</button>
-    </div>
-  </div>
-  <div class="nav-row">
-    <button class="btn btn-o" onclick="go(2)">← Geri</button>
-    <button class="btn btn-n" onclick="go(4)">Önizleme →</button>
-  </div>
-</div>
-
-<!-- STEP 5 -->
-<div class="sec" id="s4">
   <div class="sec-title">Rapor Özeti</div>
-  <div class="sec-sub">Kontrol edin ve gönderin.</div>
+  <div class="sec-sub">Raporu müşteriyle birlikte gözden geçirin. Uygunsa imzaya geçin.</div>
   <div class="pvhdr">
     <div class="co" id="pvCo">—</div>
     <div class="sub" id="pvRef">—</div>
@@ -1133,17 +1107,54 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
       <span id="pvStatus" style="font-size:12px;font-weight:700;"></span>
     </div>
   </div>
-  <div class="card">
-    <div class="clabel">İmza & Onay</div>
-    <div id="pvSigName" style="font-size:13px;font-weight:600;"></div>
-    <img id="pvSigImg" class="pvsig-img" style="display:none;"/>
-    <div id="pvSigDate" style="font-size:11px;color:var(--muted);margin-top:3px;"></div>
+  <div class="nav-row">
+    <button class="btn btn-o" onclick="go(2)">← Geri</button>
+    <button class="btn btn-n" onclick="go(4)">Onay & İmzaya Geç →</button>
+  </div>
+</div>
+
+<!-- STEP 5 — ONAY, İMZA & GÖNDER -->
+<div class="sec" id="s4">
+  <div class="sec-title">Onay & İmza</div>
+  <div class="sec-sub">Önce servisi yapan kişi, sonra müşteri imzalar. İmza zamanı, imza kaydedildiği an otomatik yazılır. İmzalar opsiyoneldir.</div>
+  <div class="card sig-card" id="sigCard_eng">
+    <div class="clabel">Servisi Yapan</div>
+    <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:2px;" id="sigEngName">—</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Genel Bilgiler'de seçilen kişi</div>
+    <div class="ig"><label>Ünvan</label>
+      <input type="text" id="engTitle" placeholder="Servis Mühendisi"/>
+      <div id="engTitleChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div></div>
+    <div id="sigPrevWrap_eng" style="display:none;margin-bottom:8px;">
+      <img id="sigPrevImg_eng" style="max-height:70px;border-radius:8px;border:1.5px solid var(--border);display:block;background:#fff;"/>
+      <div style="font-size:11px;color:var(--ok);margin-top:4px;">✅ İmza alındı · <span id="sigTime_eng"></span></div>
+    </div>
+    <div id="sigNoPrev_eng" style="font-size:12px;color:var(--muted);margin-bottom:10px;">Henüz imza alınmadı</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-a" style="flex:1;margin-top:0;" onclick="openSigModal('eng')">✍️ İmza Al / Düzenle</button>
+      <button class="btn btn-g" style="margin-top:0;width:auto;padding:10px 14px;" onclick="clearSigFull('eng')" title="Sil">🗑️</button>
+    </div>
+  </div>
+  <div class="card sig-card" id="sigCard_cust">
+    <div class="clabel">Müşteri Onay / İmza</div>
+    <div class="ig"><label>Müşteri Adı Soyadı <span style="color:var(--muted);font-weight:400">(opsiyonel)</span></label>
+      <input type="text" id="sigName" placeholder="İmzalayan kişi"/></div>
+    <div class="ig"><label>Ünvan <span style="color:var(--muted);font-weight:400">(opsiyonel)</span></label>
+      <input type="text" id="sigTitle" placeholder="Müdür, Mühendis…"/></div>
+    <div id="sigPrevWrap_cust" style="display:none;margin-bottom:8px;">
+      <img id="sigPrevImg_cust" style="max-height:70px;border-radius:8px;border:1.5px solid var(--border);display:block;background:#fff;"/>
+      <div style="font-size:11px;color:var(--ok);margin-top:4px;">✅ İmza alındı · <span id="sigTime_cust"></span></div>
+    </div>
+    <div id="sigNoPrev_cust" style="font-size:12px;color:var(--muted);margin-bottom:10px;">Henüz imza alınmadı</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-a" style="flex:1;margin-top:0;" onclick="openSigModal('cust')">✍️ İmza Al / Düzenle</button>
+      <button class="btn btn-g" style="margin-top:0;width:auto;padding:10px 14px;" onclick="clearSigFull('cust')" title="Sil">🗑️</button>
+    </div>
   </div>
   <div class="info-box">ℹ️ Önce PDF Oluştur'a basın, sonra Mail Gönder ile mail uygulamanız açılır — PDF'i ek olarak ekleyin.</div>
   <button class="btn btn-n" id="btnPDF" onclick="genPDF()">📄 PDF Oluştur</button>
   <button class="btn btn-a" id="btnMail" onclick="sendMail()">✉️ Mail Gönder</button>
   <button class="btn btn-o" id="btnHkdFromPreview" style="margin-top:8px;">🧾 Hak Ediş Raporu Oluştur</button>
-  <button class="btn btn-o" onclick="go(3)" style="margin-top:8px;">← Düzenle</button>
+  <button class="btn btn-o" onclick="go(3)" style="margin-top:8px;">← Önizlemeye Dön</button>
   <button class="btn btn-g" id="btnStep5Home" style="margin-top:6px;">🏠 Ana Sayfaya Dön</button>
 </div>
 
@@ -1151,7 +1162,7 @@ canvas#sigMC{flex:1;width:100%;display:block;touch-action:none;cursor:crosshair;
 <div id="sigModal">
   <div class="sig-modal-hdr">
     <div>
-      <div style="color:#fff;font-weight:700;font-size:15px;">✍️ Müşteri İmzası</div>
+      <div style="color:#fff;font-weight:700;font-size:15px;" id="sigModalTitle">✍️ Müşteri İmzası</div>
       <div style="color:var(--acc);font-size:10px;letter-spacing:1px;">Parmakla imzalayın</div>
     </div>
     <div style="display:flex;gap:8px;">
@@ -1169,7 +1180,7 @@ const S={
   eng:'',client:'',ctContact:'',ctEmail:'',otLimit:'17:30',
   refNo:'',weekOffset:0,extraWeeks:[],selectedDays:[],blocks:{},
   jobTitle:'',machineInfo:'',workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
-  sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',
+  sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',engSigDataUrl:'',engSigDT:'',engTitle:'',
   // Date shown in the PDF header ("Field Service Report — DD.MM.YYYY").
   // Set ONCE the first time this report's PDF is generated, then reused
   // on every later re-export so the report always shows when it was
@@ -1369,7 +1380,7 @@ function buildRef(){
 }
 
 // ═══ STEPS ═══════════════════════════════════════════════════════════════
-const SLBLS=['Adım 1/5 — Genel Bilgiler','Adım 2/5 — Tarih & Saatler','Adım 3/5 — İş Açıklaması','Adım 4/5 — İmza','Adım 5/5 — Özet & Gönder'];
+const SLBLS=['Adım 1/5 — Genel Bilgiler','Adım 2/5 — Tarih & Saatler','Adım 3/5 — İş Açıklaması','Adım 4/5 — Önizleme','Adım 5/5 — Onay, İmza & Gönder'];
 let curStep=0;
 
 function showErr(msg){
@@ -1393,8 +1404,8 @@ function go(n){
   // saveToArchive() itself decides draft vs completed based on S.pdfGenerated,
   // so this never downgrades an already-completed report.
   if(n>=1 && S.refNo) saveToArchive();
-  if(n===3)initSigStep();
-  if(n===4)buildPreview();
+  if(n===3)buildPreview();
+  if(n===4)initSigStep();
 }
 
 function validate(n){
@@ -1439,16 +1450,6 @@ function validate(n){
     S.recommendations=document.getElementById('recommendations').value;
     S.jobStatus=document.getElementById('jobStatus').value;
     if(!S.workDesc.trim()){showErr('"Yapılan İşler" alanını doldurun.');document.getElementById('workDesc').focus();return false;}
-  }
-  if(n===3){
-    S.sigName=document.getElementById('sigName').value;
-    S.sigTitle=document.getElementById('sigTitle').value;
-    // Only overwrite the saved signature timestamp with what's in the DOM
-    // field if that field actually has a value. This prevents an empty
-    // input (e.g. right after reopening a completed report without ever
-    // visiting the signature step) from wiping out the original sigDT.
-    const dtVal=document.getElementById('sigDT').value;
-    if(dtVal) S.sigDT=dtVal;
   }
   return true;
 }
@@ -1893,24 +1894,54 @@ function chkConflicts(ds){
 // ═══ SIGNATURE ════════════════════════════════════════════════════════════
 let mcDrawing=false,mcLX=0,mcLY=0;
 
+// İki imza: servis mühendisi ('eng') ve müşteri ('cust'). İmza zamanı elle
+// girilmez; imza penceresinde "Kaydet"e basıldığı an kaydedilir.
+let sigTarget='cust';
+const SIGF={eng:{img:'engSigDataUrl',dt:'engSigDT'},cust:{img:'sigDataUrl',dt:'sigDT'}};
+function localNowISO(){ const n=new Date(); return new Date(n-n.getTimezoneOffset()*60000).toISOString().slice(0,16); }
+function fmtSigDT(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+// Servisi yapanın ünvanı: elle yazılır ya da hazır seçeneklerden seçilir.
+// Her kişi için son kullanılan ünvan cihazda hatırlanır ve yeni raporda otomatik gelir.
+const ENG_TITLE_OPTS=['Servis Mühendisi','Servis Teknisyeni','Proje Mühendisi','Servis ve Proje Müdürü'];
+function engTitleFor(name){ try{ const m=lsGet('sr_eng_titles',{})||{}; return m[name]||''; }catch(e){ return ''; } }
+function rememberEngTitle(){ if(!S.eng||!S.engTitle) return; try{ const m=lsGet('sr_eng_titles',{})||{}; m[S.eng]=S.engTitle; lsSet('sr_eng_titles',m); }catch(e){} }
+function renderEngTitle(){
+  if(!S.engTitle) S.engTitle=engTitleFor(S.eng)||'Servis Mühendisi';
+  const inp=document.getElementById('engTitle'); if(inp) inp.value=S.engTitle;
+  const box=document.getElementById('engTitleChips'); if(!box) return;
+  box.innerHTML=ENG_TITLE_OPTS.map(function(t){
+    const on=t===S.engTitle;
+    return '<button type="button" data-t="'+t+'" style="border:1.5px solid '+(on?'var(--navy)':'var(--border)')+';background:'+(on?'var(--navy)':'#fff')+';color:'+(on?'#fff':'var(--navy)')+';border-radius:99px;padding:6px 11px;font-size:12px;font-weight:600;font-family:var(--f);cursor:pointer;">'+t+'</button>';
+  }).join('');
+}
+(function(){
+  const inp=document.getElementById('engTitle'), box=document.getElementById('engTitleChips');
+  if(inp) inp.addEventListener('input',function(){ S.engTitle=inp.value.trim(); rememberEngTitle(); renderEngTitle(); inp.focus(); });
+  if(box) box.addEventListener('click',function(e){ const b=e.target.closest('button[data-t]'); if(!b) return; S.engTitle=b.dataset.t; rememberEngTitle(); renderEngTitle(); if(S.refNo) saveToArchive(); });
+})();
 function initSigStep(){
-  if(!document.getElementById('sigDT').value){
-    const now=new Date();
-    document.getElementById('sigDT').value=new Date(now-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  }
+  const en=document.getElementById('sigEngName'); if(en) en.textContent=S.eng||'—';
+  renderEngTitle();
   updateSigPrev();
 }
-
 function updateSigPrev(){
-  const has=S.sigDataUrl&&S.sigDataUrl.length>100;
-  document.getElementById('sigPrevWrap').style.display=has?'block':'none';
-  document.getElementById('sigNoPrev').style.display=has?'none':'block';
-  if(has)document.getElementById('sigPrevImg').src=S.sigDataUrl;
+  ['eng','cust'].forEach(function(w){
+    const f=SIGF[w], has=!!(S[f.img]&&S[f.img].length>100);
+    const pw=document.getElementById('sigPrevWrap_'+w); if(!pw) return;
+    pw.style.display=has?'block':'none';
+    document.getElementById('sigNoPrev_'+w).style.display=has?'none':'block';
+    if(has){ document.getElementById('sigPrevImg_'+w).src=S[f.img]; document.getElementById('sigTime_'+w).textContent=fmtSigDT(S[f.dt]); }
+  });
 }
-
-function clearSigFull(){S.sigDataUrl='';updateSigPrev();}
-
-function openSigModal(){
+function clearSigFull(w){
+  (w?[w]:['eng','cust']).forEach(function(x){ S[SIGF[x].img]=''; S[SIGF[x].dt]=''; });
+  updateSigPrev();
+  if(S.refNo) saveToArchive();
+}
+function openSigModal(w){
+  sigTarget=(w==='eng')?'eng':'cust';
+  const t=document.getElementById('sigModalTitle');
+  if(t) t.textContent= sigTarget==='eng' ? '✍️ Servisi Yapan İmzası'+(S.eng?' - '+S.eng:'') : '✍️ Müşteri İmzası';
   const m=document.getElementById('sigModal');m.style.display='flex';
   try{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});}catch{}
   setTimeout(initMC,80);
@@ -1927,14 +1958,29 @@ function initMC(){
   const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
   ctx.strokeStyle='#0D1B2A';ctx.lineWidth=3;ctx.lineCap='round';ctx.lineJoin='round';
   ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
-  if(S.sigDataUrl&&S.sigDataUrl.length>100){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,w,h);img.src=S.sigDataUrl;}
+  const cur=S[SIGF[sigTarget].img]; cv._drawn=false;
+  if(cur&&cur.length>100){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,w,h);img.src=cur;}
   function pos(e){const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return[t.clientX-r.left,t.clientY-r.top];}
-  cv.onmousedown=cv.ontouchstart=e=>{e.preventDefault();mcDrawing=true;[mcLX,mcLY]=pos(e);};
+  cv.onmousedown=cv.ontouchstart=e=>{e.preventDefault();mcDrawing=true;cv._drawn=true;[mcLX,mcLY]=pos(e);};
   cv.onmousemove=cv.ontouchmove=e=>{if(!mcDrawing)return;e.preventDefault();const[x,y]=pos(e);ctx.beginPath();ctx.moveTo(mcLX,mcLY);ctx.lineTo(x,y);ctx.stroke();mcLX=x;mcLY=y;};
   cv.onmouseup=cv.ontouchend=cv.onmouseleave=()=>{mcDrawing=false;};
 }
-function clearMC(){const cv=document.getElementById('sigMC');if(!cv)return;const dpr=window.devicePixelRatio||1;const ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width/dpr,cv.height/dpr);}
-function saveMC(){const cv=document.getElementById('sigMC');if(cv)S.sigDataUrl=cv.toDataURL('image/png');updateSigPrev();closeMC();}
+function clearMC(){const cv=document.getElementById('sigMC');if(!cv)return;cv._cleared=true;cv._drawn=false;const dpr=window.devicePixelRatio||1;const ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width/dpr,cv.height/dpr);}
+function saveMC(){
+  const cv=document.getElementById('sigMC'); if(!cv){ closeMC(); return; }
+  const f=SIGF[sigTarget], had=!!(S[f.img]&&S[f.img].length>100);
+  if(cv._drawn){ S[f.img]=cv.toDataURL('image/png'); S[f.dt]=localNowISO(); }      // yeni imza → zaman = şimdi
+  else if(cv._cleared){ S[f.img]=''; S[f.dt]=''; }                                 // temizleyip kaydetti → imza yok
+  // hiçbir şey çizilmediyse mevcut imza ve zamanı aynen kalır
+  cv._cleared=false;
+  updateSigPrev(); closeMC();
+  if(S.refNo) saveToArchive();
+}
+
+['sigName','sigTitle'].forEach(function(id){
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('input',function(){ S[id]=el.value; });
+});
 
 // ═══ PREVIEW ══════════════════════════════════════════════════════════════
 function buildPreview(){
@@ -2015,11 +2061,6 @@ function buildPreview(){
   document.getElementById('pvMat').innerHTML=S.materials?'<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;">KULLANILAN PARÇALAR</div><div style="font-size:13px;white-space:pre-wrap;">'+S.materials+'</div>':'';
   document.getElementById('pvRec').innerHTML=S.recommendations?'<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;">SONRAKİ AKSİYONLAR</div><div style="font-size:13px;white-space:pre-wrap;">'+S.recommendations+'</div>':'';
   document.getElementById('pvStatus').textContent=S.jobStatus;
-  const nstr=[S.sigName,S.sigTitle].filter(Boolean).join(' — ');
-  document.getElementById('pvSigName').textContent=nstr;
-  const si=document.getElementById('pvSigImg');
-  if(S.sigDataUrl&&S.sigDataUrl.length>100){si.src=S.sigDataUrl;si.style.display='block';}else si.style.display='none';
-  if(S.sigDT)document.getElementById('pvSigDate').textContent=new Date(S.sigDT).toLocaleString('tr-TR');
 }
 
 
@@ -2315,25 +2356,39 @@ function drawSahaRaporuBody(doc, st, F, sf, sfb){
     y+=8;
   }
 
-  {
-    let sigBlockH=11;
-    if(st.sigDataUrl&&st.sigDataUrl.length>100) sigBlockH+=33;
-    if(st.sigName) sigBlockH+=6;
-    if(st.sigTitle) sigBlockH+=5;
-    if(st.sigDT) sigBlockH+=5;
-    if(!st.sigDataUrl&&!st.sigName) sigBlockH+=5;
-    const PAGE_BOTTOM=287;
-    if(y+sigBlockH>PAGE_BOTTOM){doc.addPage();y=20;}
-  }
-
+  // İmza bölümü. Servis mühendisi imzası varsa iki sütun (solda mühendis,
+  // sağda müşteri); yoksa yalnızca "Müşteri Onay / İmza". İmza yoksa alan boş
+  // kalır (sözlü onay olabilir) — "imza alınmamıştır" yazılmaz. Her sütunda ad,
+  // ünvan, tarih ve imza sütunun ORTASINA hizalanır.
+  const hasImg=function(u){ return !!(u&&u.length>100); };
+  const showEng=hasImg(st.engSigDataUrl);
+  const cols=[];
+  if(showEng) cols.push({head:'SERVİSİ YAPAN',name:st.eng,title:st.eng?(st.engTitle||'Servis Mühendisi'):'',dt:st.engSigDT,img:st.engSigDataUrl});
+  cols.push({head:'MÜŞTERİ ONAY / İMZA',name:st.sigName,title:st.sigTitle,dt:hasImg(st.sigDataUrl)?st.sigDT:'',img:st.sigDataUrl});
+  const colW=(W-2*M)/2;
+  const colH=function(c){ return (c.name?6:0)+(c.title?5:0)+(c.dt?5:0)+(hasImg(c.img)?33:0); };
+  const blockH=11+Math.max.apply(null,cols.map(colH))+4;
+  if(y+blockH>287){doc.addPage();y=20;}
   doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
   sfb();doc.setTextColor(255,255,255);doc.setFontSize(9);
-  doc.text('MÜŞTERİ ONAY / İMZA',M+2,y+5);y+=11;
-  if(st.sigName){sfb();doc.setFontSize(10);doc.setTextColor(20,20,40);doc.text(st.sigName,M,y);y+=6;}
-  if(st.sigTitle){sf();doc.setFontSize(9);doc.setTextColor(60,70,90);doc.text(st.sigTitle,M,y);y+=5;}
-  if(st.sigDT){sf();doc.setFontSize(8);doc.setTextColor(100,110,120);doc.text('Tarih: '+new Date(st.sigDT).toLocaleString('tr-TR'),M,y);y+=5;}
-  if(st.sigDataUrl&&st.sigDataUrl.length>100){try{doc.addImage(st.sigDataUrl,'PNG',M,y,70,30,undefined,'FAST');}catch(e){}y+=33;}
-  if(!st.sigDataUrl&&!st.sigName){sf();doc.setTextColor(160,160,160);doc.setFontSize(8);doc.text('İmza alınmamıştır',M,y);}
+  cols.forEach(function(c,k){ doc.text(c.head,M+k*colW+colW/2,y+5,{align:'center'}); });
+  y+=11;
+  const y0=y; let yMax=y;
+  cols.forEach(function(c,k){
+    const cx=M+k*colW+colW/2; let yy=y0;
+    if(c.name){sfb();doc.setFontSize(10);doc.setTextColor(20,20,40);doc.text(doc.splitTextToSize(String(c.name),colW-6)[0],cx,yy,{align:'center'});yy+=6;}
+    if(c.title){sf();doc.setFontSize(9);doc.setTextColor(60,70,90);doc.text(doc.splitTextToSize(String(c.title),colW-6)[0],cx,yy,{align:'center'});yy+=5;}
+    if(c.dt){sf();doc.setFontSize(8);doc.setTextColor(100,110,120);doc.text('İmza: '+fmtSigDT(c.dt),cx,yy,{align:'center'});yy+=5;}
+    if(hasImg(c.img)){
+      // İmza 70×30 mm kutuya oranı bozulmadan sığdırılır ve ortalanır.
+      let iw=70, ih=30;
+      try{ const p=doc.getImageProperties(c.img); const r=Math.min(70/p.width,30/p.height); iw=p.width*r; ih=p.height*r; }catch(e){}
+      try{ doc.addImage(c.img,'PNG',cx-iw/2,yy+(30-ih)/2,iw,ih,undefined,'FAST'); }catch(e){}
+      yy+=33;
+    }
+    yMax=Math.max(yMax,yy);
+  });
+  y=yMax+4;
 
   return y;
 }
@@ -2884,7 +2939,7 @@ function copyReport(r){
         otLimit:src.otLimit||'17:30',
         refNo:'', _refWeekKey:'', weekOffset:0, extraWeeks:[], selectedDays:[], blocks:{},
         jobTitle:'', machineInfo:'', workDesc:'', materials:'', recommendations:'', jobStatus:'Tamamlandı',
-        sigDataUrl:'', sigName:'', sigTitle:'', sigDT:'', pdfGenerated:false, reportDate:''
+        sigDataUrl:'', sigName:'', sigTitle:'', sigDT:'', engSigDataUrl:'', engSigDT:'', engTitle:'', pdfGenerated:false, reportDate:''
       });
 
       fillSel('engSel',engineers,S.eng);
@@ -2916,7 +2971,7 @@ function openReport(r){
   const sub = r.refNo+' — '+(isDraft?'Taslağı düzenlemeye devam etmek':'Raporu görüntülemek')+' ister misiniz?';
 
   showConfirm(title, sub, function(){
-    Object.assign(S, r.state);
+    Object.assign(S, {engSigDataUrl:'', engSigDT:'', engTitle:''}, r.state);
     // Backward compatibility: reports saved before reportDate existed have
     // no such field in their stored state, so it comes back undefined —
     // which the "if(!S.reportDate)" check in genPDF() treats as unset and
@@ -2947,9 +3002,6 @@ function openReport(r){
     // report and going back to "Düzenle" → Önizleme doesn't silently
     // overwrite it with "now". Without this the PDF's signed date kept
     // changing every time the report was reopened and re-exported.
-    if(S.sigDT){
-      document.getElementById('sigDT').value=S.sigDT;
-    }
     updateOTInfo();
     renderWeek();
 
@@ -2959,6 +3011,7 @@ function openReport(r){
       goToStep(0);
     } else {
       goToStep(4);
+      initSigStep();
       buildPreview();
     }
   });
@@ -2966,6 +3019,7 @@ function openReport(r){
 
 // Navigate to a step without validation (used when restoring/switching screens)
 function goToStep(n){
+  if(n===4){ try{ initSigStep(); }catch(e){} }
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   curStep=n;
   document.getElementById('s'+n).classList.add('active');
@@ -3053,7 +3107,7 @@ function startNewReport(){
     eng:'',client:'',ctContact:'',ctEmail:'',otLimit:'17:30',
     refNo:'',weekOffset:0,extraWeeks:[],selectedDays:[],blocks:{},
     jobTitle:'',machineInfo:'',workDesc:'',materials:'',recommendations:'',jobStatus:'Tamamlandı',
-    sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',pdfGenerated:false,reportDate:''
+    sigDataUrl:'',sigName:'',sigTitle:'',sigDT:'',engSigDataUrl:'',engSigDT:'',engTitle:'',pdfGenerated:false,reportDate:''
   });
   showReportForm();
   goToStep(0);
@@ -4265,7 +4319,13 @@ function genHakedisPDF(){
       doc.text('Sayfa '+p+'/'+pages,W-M,288,{align:'right'});
     }
 
-    const fname='HakEdis_'+(H.client||'Rapor').replace(/[\s\/]/g,'_')+'_'+H.refNo+'.pdf';
+    // Dosya adı: "41.Hafta Gönenli Süt Akhisar Fatura ve Hakediş Formu HK41-01-26.pdf"
+    // Hafta: çalışılan ilk günün haftası; yoksa dönem alanı ya da hak ediş no.
+    let hkWeek='';
+    try{ if(H.workDays&&H.workDays.length) hkWeek=String(getWN(new Date(H.workDays.slice().sort()[0]+'T00:00:00'))); }catch(e){}
+    if(!hkWeek){ const m=String(H.period||'').match(/(\d{1,2})/)||String(H.refNo||'').match(/^HK(\d{1,2})-/); if(m) hkWeek=m[1]; }
+    const clean=function(x){ return String(x||'').replace(/[\/\\:*?"<>|_]+/g,' ').trim().replace(/\s+/g,' '); };
+    const fname=[hkWeek?hkWeek+'.Hafta':'', clean(H.client), 'Fatura ve Hakediş Formu', clean(H.refNo)].filter(Boolean).join(' ')+'.pdf';
     const blob=doc.output('blob');
     const url=URL.createObjectURL(blob);
     showPDFReadyModal(url, fname, blob);
@@ -4499,7 +4559,23 @@ function renderPriceList(){
 // (single rate, for Bakım Anlaşması customers billed one way regardless
 // of the type of work performed).
 let plCurrentMode='tiered';
+// Fiyat listesi PDF'indeki "NOT" maddeleri. Bakım anlaşmasında fiyatlar
+// anlaşma süresince sabit olduğu için "tek taraflı revize" maddesi yoktur.
+const PL_TERMS_DEFAULT={
+  tiered:['Uçak, taksi, araç kirası, geçiş ücretleri, otopark ücretleri, otel, harcırah vb. gibi masraflar ayrıca faturalanacaktır.',
+          'MekNovak, gerekli gördüğü durumlarda fiyatlarını tek taraflı olarak revize etme hakkını saklı tutar.',
+          'Fiyatlar KDV hariçtir.'].join('\n'),
+  flat:['Uçak, taksi, araç kirası, geçiş ücretleri, otopark ücretleri, otel, harcırah vb. gibi masraflar ayrıca faturalanacaktır.',
+        'Bakım anlaşması süresince (1 yıl) servis ücretleri sabittir.',
+        'Günlük harcırah enflasyon oranında güncellenebilir.',
+        'Fiyatlar KDV hariçtir.'].join('\n')
+};
+function plTermsOf(p){ return (p&&typeof p.terms==='string'&&p.terms.trim())?p.terms:PL_TERMS_DEFAULT[(p&&p.mode)==='flat'?'flat':'tiered']; }
+function firstOfMonthISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
 function setPlMode(mode){
+  // Şartlar elle değiştirilmediyse yeni tarife tipinin hazır metnine geç.
+  const te=document.getElementById('plTerms');
+  if(te && (!te.value.trim() || te.value===PL_TERMS_DEFAULT.tiered || te.value===PL_TERMS_DEFAULT.flat)) te.value=PL_TERMS_DEFAULT[mode==='flat'?'flat':'tiered'];
   plCurrentMode=mode;
   const tieredBtn=document.getElementById('plModeTiered'), flatBtn=document.getElementById('plModeFlat');
   if(tieredBtn) tieredBtn.classList.toggle('active',mode==='tiered');
@@ -4535,6 +4611,9 @@ function editPriceEntry(id){
   document.getElementById('plHarcirah').value=p.harcirah||1500;
   document.getElementById('plTravelMult').value=(p.travelMultiplier!=null?p.travelMultiplier:0.75);
   document.getElementById('plNote').value=p.note||'';
+  document.getElementById('plDate').value=p.date||'';
+  document.getElementById('plPeriod').value=p.period||'';
+  document.getElementById('plTerms').value=plTermsOf(p);
   if(p.mode==='tiered'){
     setPlMode('tiered');
     const t=p.tiers||{};
@@ -4562,6 +4641,9 @@ function resetPlForm(){
   document.getElementById('plHarcirah').value='1500';
   document.getElementById('plTravelMult').value='0.75';
   document.getElementById('plNote').value='';
+  document.getElementById('plDate').value=firstOfMonthISO();
+  document.getElementById('plPeriod').value='';
+  document.getElementById('plTerms').value='';
   document.getElementById('plFormTitle').textContent='Yeni Kayıt';
   document.getElementById('btnPlAdd').textContent='+ Kaydet';
   document.getElementById('btnPlCancelEdit').style.display='none';
@@ -4574,7 +4656,8 @@ function savePriceEntry(){
   let travelMultiplier=parseDecimal(document.getElementById('plTravelMult').value);
   if(!travelMultiplier) travelMultiplier=0.75;
   const note=document.getElementById('plNote').value.trim();
-  let entry={id:plEditingId||('pl_'+Date.now()), name:name, mode:plCurrentMode, discount:discount, harcirah:harcirah, travelMultiplier:travelMultiplier, note:note};
+  let entry={id:plEditingId||('pl_'+Date.now()), name:name, mode:plCurrentMode, discount:discount, harcirah:harcirah, travelMultiplier:travelMultiplier, note:note,
+    date:document.getElementById('plDate').value||'', period:document.getElementById('plPeriod').value.trim(), terms:document.getElementById('plTerms').value.trim()};
   if(plCurrentMode==='tiered'){
     entry.tiers={
       planliBakim:parseDecimal(document.getElementById('plRateBakim').value),
@@ -4620,15 +4703,21 @@ function genPriceListPDF(p){
     }catch(e){console.warn('Font registration failed:',e);}
     const sf=function(){doc.setFont(F,'normal');}, sfb=function(){doc.setFont(F,'bold');};
 
-    doc.setFillColor(13,27,42);doc.rect(0,0,W,22,'F');
-    doc.setTextColor(255,255,255);sfb();doc.setFontSize(13);
-    doc.text('TEKNİK SERVİS FİYAT LİSTESİ',M,9);
+    // Başlık: listeye verdiğiniz ad (sabit "Teknik Servis Fiyat Listesi" yazısı yok).
+    // Tarih kayıttaki "Liste Tarihi"nden gelir; dönem yazıldıysa altında durur.
+    sfb();doc.setFontSize(13);
+    const titleLines=doc.splitTextToSize(String(p.name||''),W-2*M-58).slice(0,2);
+    const hdrH=titleLines.length>1?27:22;
+    doc.setFillColor(13,27,42);doc.rect(0,0,W,hdrH,'F');
+    doc.setTextColor(255,255,255);
+    titleLines.forEach(function(l,i){ doc.text(l,M,10+i*6); });
     doc.setFontSize(8);sf();doc.setTextColor(245,166,35);
-    doc.text(p.name,M,15);
+    doc.text('MekNovak Mühendislik ve Otomasyon Ltd. Şti.',M,10+titleLines.length*6);
+    const listDate=p.date?fmtDateShort(p.date).replace(/\//g,'.'):new Date().toLocaleDateString('tr-TR');
     sfb();doc.setFontSize(9);doc.setTextColor(255,255,255);
-    doc.text('Tarih: '+new Date().toLocaleDateString('tr-TR'),W-M,8,{align:'right'});
-    if((parseFloat(p.discount)||0)>0) doc.text('%'+p.discount+' indirim uygulanmıştır',W-M,13.5,{align:'right'});
-    y=30;
+    doc.text('Tarih: '+listDate,W-M,9,{align:'right'});
+    if(p.period){ sf();doc.setFontSize(8);doc.text(doc.splitTextToSize('Dönem: '+p.period,56)[0],W-M,14.5,{align:'right'}); }
+    y=hdrH+8;
 
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(8);
@@ -4661,37 +4750,49 @@ function genPriceListPDF(p){
     doc.setFillColor(13,27,42);doc.rect(M,y,W-2*M,7,'F');
     sfb();doc.setTextColor(255,255,255);doc.setFontSize(8);
     doc.text('SERVİS TÜRÜ VE ÜCRETLER (KDV HARİÇ)',M+2,y+5); y+=7;
-    const cw2=[60,30,30,30,30];
+    // İndirim varsa her hizmet için iki satır: liste fiyatı (gri) ve indirimli
+    // fiyat (koyu). İndirim yoksa tek satır.
+    const disc=parseFloat(p.discount)||0;
+    const cw2=disc>0?[54,24,26,26,26,26]:[60,30,30,30,30];
     const colX2=[M+2]; for(let i=0;i<cw2.length;i++) colX2.push(colX2[i]+cw2[i]);
     doc.setFillColor(220,226,235);doc.rect(M,y,W-2*M,6,'F');
     sfb();doc.setFontSize(7);doc.setTextColor(50,60,80);
-    ['Servis Türü','Normal','FM-1','FM-2','Yol (x'+String(travelMult).replace('.',',')+')'].forEach(function(h,i){doc.text(h,colX2[i],y+4);});
+    (disc>0?['Servis Türü','Fiyat']:['Servis Türü']).concat(['Normal','FM-1','FM-2','Yol (x'+String(travelMult).replace('.',',')+')']).forEach(function(h,i){doc.text(h,colX2[i],y+4);});
     y+=6;
-
-    function tierAmounts(baseRate,hasYol){
-      const eff=round2((parseFloat(baseRate)||0)*(1-(parseFloat(p.discount)||0)/100));
-      return [fmtTL(eff), fmtTL(round2(eff*1.4)), fmtTL(round2(eff*1.8)), hasYol?fmtTL(round2(eff*travelMult)):'-'];
+    function amounts(base,hasYol){
+      const b=parseFloat(base)||0;
+      return [fmtTL(round2(b)), fmtTL(round2(b*1.4)), fmtTL(round2(b*1.8)), hasYol?fmtTL(round2(b*travelMult)):'-'];
     }
-    let rows2;
+    let services;
     if(p.mode==='tiered'){
       const t=p.tiers||{};
-      rows2=[
-        ['Planlı Bakım'].concat(tierAmounts(t.planliBakim,true)),
-        ['Uzaktan Destek'].concat(tierAmounts(t.uzaktanDestek,false)),
-        ['Arıza / Kurulum / Üretim Gözetimi / Proje'].concat(tierAmounts(t.arizaKurulum,true))
-      ];
+      services=[['Planlı Bakım',t.planliBakim,true],['Uzaktan Destek',t.uzaktanDestek,false],['Arıza / Kurulum / Üretim Gözetimi / Proje',t.arizaKurulum,true]];
     } else {
-      rows2=[['Bakım Anlaşması Kapsamı (Arıza, Kurulum, Bakım, Uzaktan Destek)'].concat(tierAmounts(p.rate,true))];
+      services=[['Bakım Anlaşması Kapsamı (Arıza, Kurulum, Bakım, Uzaktan Destek)',p.rate,true]];
     }
-    rows2.forEach(function(r,i){
+    services.forEach(function(sv,i){
+      const listRate=parseFloat(sv[1])||0, effRate=round2(listRate*(1-disc/100));
+      sf();doc.setFontSize(7.3);
+      const wrapped=doc.splitTextToSize(sv[0],cw2[0]-3);
+      const rowH=disc>0?Math.max(14,6+wrapped.length*4):(wrapped[1]?12:8);
       doc.setFillColor(i%2===0?255:246,i%2===0?255:247,i%2===0?255:250);
-      doc.rect(M,y,W-2*M,8,'F');
-      sf();doc.setFontSize(7.3);doc.setTextColor(20,20,40);
-      const wrapped=doc.splitTextToSize(r[0],cw2[0]-2);
-      doc.text(wrapped[0],colX2[0],y+5.5);
-      if(wrapped[1]) doc.text(wrapped[1],colX2[0],y+9.5);
-      for(let k=1;k<5;k++) doc.text(r[k],colX2[k],y+5.5);
-      y+= wrapped[1] ? 12 : 8;
+      doc.rect(M,y,W-2*M,rowH,'F');
+      doc.setTextColor(20,20,40); sfb();
+      wrapped.forEach(function(l,k){ doc.text(l,colX2[0],y+5.5+k*4); });
+      if(disc>0){
+        const la=amounts(listRate,sv[2]), ea=amounts(effRate,sv[2]);
+        sf();doc.setFontSize(7);doc.setTextColor(130,130,130);
+        doc.text('Liste fiyatı',colX2[1],y+5.5);
+        la.forEach(function(v,k){ doc.text(v,colX2[k+2],y+5.5); });
+        sfb();doc.setFontSize(7.3);doc.setTextColor(15,95,45);
+        doc.text('%'+String(disc).replace('.',',')+' indirimli',colX2[1],y+11);
+        ea.forEach(function(v,k){ doc.text(v,colX2[k+2],y+11); });
+      } else {
+        const ea=amounts(listRate,sv[2]);
+        sf();doc.setFontSize(7.3);doc.setTextColor(20,20,40);
+        ea.forEach(function(v,k){ doc.text(v,colX2[k+1],y+5.5); });
+      }
+      y+=rowH;
     });
     // Clear visual break so the note paragraph below doesn't read as a
     // continuation of the pricing table above.
@@ -4703,9 +4804,10 @@ function genPriceListPDF(p){
     sfb();doc.setFontSize(7);doc.setTextColor(120,120,120);
     doc.text('NOT',M,y); y+=4;
     sf();doc.setFontSize(7.5);doc.setTextColor(80,80,80);
-    const noteLines=doc.splitTextToSize('Uçak, taksi, araç kirası, geçiş ücretleri, otopark ücretleri, otel, harcırah vb. gibi masraflar ayrıca faturalanacaktır.',W-2*M);
-    noteLines.forEach(function(l){ doc.text(l,M,y); y+=4.2; });
-    if(p.harcirah){ doc.text('Günlük Harcırah: '+fmtTL(parseFloat(p.harcirah)||0),M,y); y+=6; } else y+=2;
+    plTermsOf(p).split(/\r?\n/).map(function(l){ return l.replace(/^\s*[*•\-]\s*/,'').trim(); }).filter(Boolean).forEach(function(t){
+      doc.splitTextToSize(t,W-2*M-4).forEach(function(l,k){ if(k===0) doc.text('•',M,y); doc.text(l,M+3.5,y); y+=4.2; });
+    });
+    if(p.harcirah){ y+=1; sfb(); doc.text('Günlük Harcırah: '+fmtTL(parseFloat(p.harcirah)||0),M,y); sf(); y+=6; } else y+=2;
     if(p.note){ sf();doc.setFontSize(7.5);doc.setTextColor(100,100,100); doc.text(p.note,M,y); y+=6; }
 
     if(y>245){ doc.addPage(); y=20; }
@@ -4716,11 +4818,6 @@ function genPriceListPDF(p){
       '30 Ağustos Zafer Mah. Atlıçayır Bulvarı, Batıkent Sitesi No:39/C D:17, Nilüfer/Bursa',
       'Mobile: +90 534 366 95 88','E-mail: yusuf.ozgul@meknovak.com','Web: www.meknovak.com'
     ].forEach(function(l){ doc.text(l,M,y); y+=4.5; });
-    y+=3;
-    sf();doc.setFontSize(6.5);doc.setTextColor(140,140,140);
-    ['* MekNovak, gerekli gördüğü durumlarda fiyatlarını tek taraflı olarak revize etme hakkını saklı tutar.',
-      '* Fiyatlar KDV hariçtir.'
-    ].forEach(function(l){ doc.text(l,M,y); y+=3.8; });
 
     const pages=doc.getNumberOfPages();
     for(let pg=1;pg<=pages;pg++){
@@ -4731,7 +4828,9 @@ function genPriceListPDF(p){
       doc.text('Sayfa '+pg+'/'+pages,W-M,288,{align:'right'});
     }
 
-    const fname='FiyatListesi_'+String(p.name||'Liste').replace(/[\s\/]/g,'_')+'.pdf';
+    // Dosya adı = listeye verilen ad (ön ek yok). Yalnızca dosya adında
+    // kullanılamayan karakterler ( / \ : * ? " < > | ) çıkarılır.
+    const fname=(String(p.name||'Fiyat Listesi').replace(/[\/\\:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim()||'Fiyat Listesi')+'.pdf';
     const blob=doc.output('blob');
     const url=URL.createObjectURL(blob);
     showPDFReadyModal(url, fname, blob);
@@ -4893,6 +4992,8 @@ if(hkdPriceSelEl) hkdPriceSelEl.addEventListener('change',function(){
 });
 const btnPlCancelEdit=document.getElementById('btnPlCancelEdit');
 if(btnPlCancelEdit) btnPlCancelEdit.addEventListener('click',resetPlForm);
+const plTermsReset=document.getElementById('plTermsReset');
+if(plTermsReset) plTermsReset.addEventListener('click',function(e){ e.preventDefault(); document.getElementById('plTerms').value=PL_TERMS_DEFAULT[plCurrentMode==='flat'?'flat':'tiered']; });
 const plModeTieredBtn=document.getElementById('plModeTiered');
 if(plModeTieredBtn) plModeTieredBtn.addEventListener('click',function(){ setPlMode('tiered'); });
 const plModeFlatBtn=document.getElementById('plModeFlat');
@@ -6071,9 +6172,33 @@ function initTeklifDelegation(){
 // KURAL: Dosyada yapılan HER değişiklikte APP_VERSION artırılır ve
 // APP_CHANGELOG'un başına bir kayıt eklenir. Büyük yeni özellik → ilk sayı
 // artar (7.0 → 8.0); düzeltme / küçük ekleme → ikinci sayı artar (7.0 → 7.1).
-// Dosya adı da aynı sürümü taşır: Saha_Raporu_Hak_Edis_Teklif_v7.1.html
-const APP_VERSION='7.1', APP_VERSION_DATE='12.10.2026';
+// Dosya adı da aynı sürümü taşır: Saha_Raporu_Hak_Edis_Teklif_v8.2.html
+const APP_VERSION='8.2', APP_VERSION_DATE='18.10.2026';
 const APP_CHANGELOG=[
+  {v:'8.2',d:'18.10.2026',items:[
+    'İmza bölümü başlığı "Servisi Yapan" oldu',
+    'Servisi yapanın ünvanı elle yazılabiliyor ya da hazır seçeneklerden seçilebiliyor; kişi başına son ünvan hatırlanıyor'
+  ]},
+  {v:'8.1',d:'18.10.2026',items:[
+    'PDF imza bölümü: imza yoksa alan boş kalır ("İmza alınmamıştır" yazmaz)',
+    'Servis mühendisi imzası yoksa yalnızca "Müşteri Onay / İmza" bölümü basılır',
+    'İmza bölümünde ad, ünvan, tarih ve imza sütun ortasına hizalı; imza oranı korunur'
+  ]},
+  {v:'8.0',d:'18.10.2026',items:[
+    'Saha Raporu: önizleme artık imzadan ÖNCE (Adım 4); müşteri raporu görüp sonra imzalar',
+    'Saha Raporu: servis mühendisi imzası eklendi (Genel Bilgiler\'de seçilen mühendis)',
+    'İmza tarih-saati elle girilmiyor; imza kaydedildiği an otomatik yazılıyor',
+    'PDF: imza bölümünde solda servis mühendisi, sağda müşteri'
+  ]},
+  {v:'7.5',d:'13.10.2026',items:['Hak ediş PDF dosya adında alt çizgi yok: 41.Hafta Gönenli Süt Akhisar Fatura ve Hakediş Formu HK41-01-26.pdf']},
+  {v:'7.4',d:'13.10.2026',items:['Hak ediş PDF dosya adı: 41.Hafta_Müşteri_Fatura_ve_Hakediş_Formu_HK41-01-26.pdf']},
+  {v:'7.3',d:'13.10.2026',items:['Fiyat listesi PDF dosya adı listeye verdiğiniz adın aynısı ("FiyatListesi_" ön eki ve alt çizgiler yok)']},
+  {v:'7.2',d:'12.10.2026',items:[
+    'Fiyat listesi PDF: başlık olarak listeye verdiğiniz ad yazılır',
+    'Fiyat listesi: tarih ve dönem elle girilir (yeni listede ayın 1\'i gelir)',
+    'Fiyat listesi: NOT maddeleri düzenlenebilir; bakım anlaşmasında "tek taraflı revize" maddesi yok',
+    'Fiyat listesi: indirim varsa tabloda liste fiyatı ve indirimli fiyat alt alta'
+  ]},
   {v:'7.1',d:'12.10.2026',items:[
     'Hak ediş PDF: otel, uçak, araç ve diğer faturalarda her fatura kendi sayfasında, başlığı ve tutar satırıyla birlikte',
     'PDF boyutu: imza görseli sıkıştırılarak ekleniyor (dosya çok daha küçük)'
