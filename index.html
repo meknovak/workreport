@@ -769,7 +769,9 @@ canvas#sigMC{flex:none;display:block;margin:auto auto 10px;width:min(calc(100vw 
     <div class="ig"><label>İndirim (%)</label><input type="text" inputmode="decimal" class="numdec" id="hkdDiscount" placeholder="Ör: 15" value="0"/></div>
     <div class="hkd-note" id="hkdRatePreview">Uygulanan ücret: 0,00 TL/saat</div>
     <div class="hkd-note" id="hkdPriceListNote" style="display:none;"></div>
-    <div class="hkd-note">Çarpanlar: Normal ×1 · Fazla Mesai I ×1.4 · Fazla Mesai II ×1.8 · Yol × (fiyat listesinden gelir, varsayılan 0.75).</div>
+    <div class="ig" style="margin-top:9px;"><label>Yol Zamanı Çarpanı</label><input type="text" inputmode="decimal" class="numdec" id="hkdTravelMult" placeholder="0.75"/></div>
+    <div class="hkd-note" id="hkdTmNote" style="display:none;"></div>
+    <div class="hkd-note">Çarpanlar: Normal ×1 · Fazla Mesai I ×1.4 · Fazla Mesai II ×1.8 · Yol × <span id="hkdTmLbl">0,75</span> (fiyat listesinden gelir; burada değiştirilebilir).</div>
   </div>
 
   <div class="card">
@@ -3475,6 +3477,35 @@ function startHakedisNew(){
 }
 
 // ── Screen open/render ────────────────────────────────────────────────
+// Yol çarpanı her zaman bağlı fiyat listesindeki GÜNCEL değerle karşılaştırılır.
+// Liste sonradan değiştirildiyse taslak hak edişte otomatik güncellenir;
+// tamamlanmış (PDF'i oluşturulmuş) hak edişte uyarı + tek dokunuşla güncelleme.
+function listTravelMult(){
+  if(!H.priceListId) return null;
+  const p=(lsGet('mn_pricelists',[])||[]).find(function(x){ return x.id===H.priceListId; });
+  if(!p) return null;
+  return p.travelMultiplier!=null?parseFloat(p.travelMultiplier):0.75;
+}
+function fmtMult(m){ return String(m).replace('.',','); }
+function refreshTravelMultUI(force){
+  const m=H.travelMultiplier!=null?parseFloat(H.travelMultiplier):0.75;
+  const inp=document.getElementById('hkdTravelMult'); if(inp && (force || document.activeElement!==inp)) inp.value=fmtMult(m);
+  const lb=document.getElementById('hkdTmLbl'); if(lb) lb.textContent=fmtMult(m);
+  const note=document.getElementById('hkdTmNote'); if(!note) return;
+  const lm=listTravelMult();
+  if(lm!=null && Math.abs(lm-m)>1e-9){
+    note.style.display='block'; note.style.color='#8A1C1C';
+    note.innerHTML='⚠️ Fiyat listesinde yol çarpanı '+fmtMult(lm)+', bu hak edişte '+fmtMult(m)+'. <a href="#" id="hkdTmApply">Listedeki değeri kullan</a>';
+    const a=document.getElementById('hkdTmApply');
+    if(a) a.onclick=function(e){ e.preventDefault(); H.travelMultiplier=lm; refreshTravelMultUI(true); renderHakedisCalc(); scheduleHkdAutosave(); };
+  } else note.style.display='none';
+}
+function syncTravelMultWithList(){
+  const lm=listTravelMult(); if(lm==null) return false;
+  const m=H.travelMultiplier!=null?parseFloat(H.travelMultiplier):0.75;
+  if(Math.abs(lm-m)<1e-9 || H.status==='completed') return false;
+  H.travelMultiplier=lm; return true;
+}
 function refreshPriceListNote(){
   const el=document.getElementById('hkdPriceListNote');
   if(!el) return;
@@ -3606,7 +3637,10 @@ function openHakedisScreen(){
   if(H.sourceReportId){ hn.style.display='block'; hn.textContent='Bu bilgiler seçtiğiniz saha raporundan otomatik dolduruldu — istersen üzerine yazabilirsin.'; }
   else hn.style.display='none';
   fillPriceSelect();
+  const tmChanged=syncTravelMultWithList();
   refreshPriceListNote();
+  refreshTravelMultUI(true);
+  if(tmChanged){ const n=document.getElementById('hkdTmNote'); if(n){ n.style.display='block'; n.style.color='#2E7D32'; n.textContent='✓ Yol çarpanı fiyat listesindeki güncel değere ('+fmtMult(H.travelMultiplier)+') göre güncellendi.'; } }
   renderExpenses();
   renderHakedisCalc();
   checkReportMismatch();
@@ -4001,7 +4035,7 @@ function renderHakedisCalc(){
     ['Normal Zaman (×1.0)', t.hN, t.rNormal, t.aNormal],
     ['Fazla Mesai I (×1.4)', t.hF1, t.rFm1, t.aFm1],
     ['Fazla Mesai II (×1.8)', t.hF2, t.rFm2, t.aFm2],
-    ['Yol Zamanı (×0.75)', t.hT, t.rTravel, t.aTravel]
+    ['Yol Zamanı (×'+fmtMult(t.travelMult)+')', t.hT, t.rTravel, t.aTravel]
   ];
   let html='<table class="hkd-table"><thead><tr><th>Kalem</th><th>Saat</th><th>Birim</th><th>Tutar</th></tr></thead><tbody>';
   rows.forEach(function(r){
@@ -4056,6 +4090,7 @@ function genHakedisPDF(){
   btn.textContent='⏳ Oluşturuluyor…'; btn.disabled=true;
   try{
     syncHkdFromDOM();
+    if(syncTravelMultWithList()) refreshTravelMultUI();
     if(window.YK) YK.refreshAll(); // eski biçimde kaydedilmiş bilgi kartlarını güncel görünüme çevir
     if(!window.jspdf) throw new Error('jsPDF yüklenmedi');
     const{jsPDF}=window.jspdf;
@@ -4151,7 +4186,7 @@ function genHakedisPDF(){
     y+=6;
 
     const rowMult=[1,1.4,1.8,t.travelMult];
-    const rowLabels=['Normal Zaman (x1.0)','Fazla Mesai I (x1.4)','Fazla Mesai II (x1.8)','Yol Zamani (x'+t.travelMult+')'];
+    const rowLabels=['Normal Zaman (x1.0)','Fazla Mesai I (x1.4)','Fazla Mesai II (x1.8)','Yol Zamanı (x'+fmtMult(t.travelMult)+')'];
     const rowHours=[t.hN,t.hF1,t.hF2,t.hT];
     const rowApplied=[t.rNormal,t.rFm1,t.rFm2,t.rTravel];
     const rowAmounts=[t.aNormal,t.aFm1,t.aFm2,t.aTravel];
@@ -5068,6 +5103,7 @@ if(hkdPriceSelEl) hkdPriceSelEl.addEventListener('change',function(){
       H.priceListName=p.name+(tier?(' — '+TIER_LABELS[tier]):'');
       H.harcirahDaily=parseFloat(p.harcirah)||1500;
       H.travelMultiplier=(p.travelMultiplier!=null)?parseFloat(p.travelMultiplier):0.75;
+      refreshTravelMultUI(true);
       // Refresh any auto-computed Harcırah line to the new list's daily
       // rate — but never touch a line the user has already hand-edited.
       (H.expenses.harcirah||[]).forEach(function(it){ if(it.auto) it.gunlukTutar=H.harcirahDaily; });
@@ -5089,6 +5125,14 @@ if(hkdPriceSelEl) hkdPriceSelEl.addEventListener('change',function(){
   const el=document.getElementById(id);
   if(el) el.addEventListener('input',syncHkdFromDOM);
 });
+(function(){
+  const el=document.getElementById('hkdTravelMult');
+  if(el) el.addEventListener('input',function(){
+    const v=parseDecimal(el.value);
+    if(v>0){ H.travelMultiplier=v; refreshTravelMultUI(); renderHakedisCalc(); scheduleHkdAutosave(); }
+  });
+  if(el) el.addEventListener('blur',function(){ refreshTravelMultUI(); });
+})();
 ['hkdRate','hkdDiscount','hkdHNormal','hkdHFm1','hkdHFm2','hkdHTravel'].forEach(function(id){
   const el=document.getElementById(id);
   if(el) el.addEventListener('input',function(){ syncHkdFromDOM(); renderHakedisCalc(); checkReportMismatch(); });
@@ -6297,9 +6341,14 @@ function initTeklifDelegation(){
 // KURAL: Dosyada yapılan HER değişiklikte APP_VERSION artırılır ve
 // APP_CHANGELOG'un başına bir kayıt eklenir. Büyük yeni özellik → ilk sayı
 // artar (7.0 → 8.0); düzeltme / küçük ekleme → ikinci sayı artar (7.0 → 7.1).
-// Dosya adı da aynı sürümü taşır: Saha_Raporu_Hak_Edis_Teklif_v8.4.html
-const APP_VERSION='8.4', APP_VERSION_DATE='01.11.2026';
+// Dosya adı da aynı sürümü taşır: Saha_Raporu_Hak_Edis_Teklif_v8.5.html
+const APP_VERSION='8.5', APP_VERSION_DATE='01.11.2026';
 const APP_CHANGELOG=[
+  {v:'8.5',d:'01.11.2026',items:[
+    'DÜZELTME: Hak ediş, fiyat listesindeki yol çarpanı sonradan değiştirilince eski değerle (0,75) hesaplamaya devam ediyordu. Artık taslak hak edişler açılırken ve PDF oluşturulurken listedeki güncel değeri alıyor',
+    'Hak ediş ekranında "Yol Zamanı Çarpanı" alanı görünür ve değiştirilebilir; tamamlanmış hak edişte liste farklıysa uyarı çıkar',
+    'Hak ediş tablosundaki "Yol Zamanı (×0.75)" etiketi artık gerçek çarpanı gösteriyor'
+  ]},
   {v:'8.4',d:'01.11.2026',items:[
     'Saha Raporu: hafta içi her gün için "Gün türü" seçimi - Normal / Resmi tatil (tüm çalışma FM-2) / Yarım gün tatil (13:00 sonrası FM-2)',
     'Yol süresi tatil günlerinde de mesaiye girmez',
